@@ -1,0 +1,18 @@
+{
+  "name": "dr-doom",
+  "version": "1.0.0",
+  "description": "DR DOOM: Disaster Recovery — The Game",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "terser": "^5.46.1",
+    "vite": "^5.4.0"
+  }
+}

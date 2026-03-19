@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DR DOOM — Disaster Recovery: The Game</title>
+
+  <!-- Favicon — inline SVG, no external file -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='2' y='22' font-family='monospace' font-size='15' font-weight='bold' fill='%23ff2200'%3EDR%3C/text%3E%3Crect x='2' y='25' width='9' height='3' fill='%23ff2200'/%3E%3C/svg%3E" />
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="DR DOOM — Disaster Recovery: The Game" />
+  <meta property="og:description" content="A DOOM-inspired FPS set in a failing data center. 7 weapons modeled after real DR tools. Meet your RTO or die." />
+  <meta property="og:type"        content="website" />
+  <meta property="og:image"       content="https://anystackarchitect.com/content/images/dr-doom-og.png" />
+  <meta property="og:url"         content="https://anystackarchitect.com/dr-doom" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content="DR DOOM — Disaster Recovery: The Game" />
+  <meta name="twitter:description" content="A DOOM-inspired FPS set in a failing data center. 7 weapons modeled after real DR tools. Meet your RTO or die." />
+  <meta name="twitter:image"       content="https://anystackarchitect.com/content/images/dr-doom-og.png" />
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; background:#000; overflow:hidden; font-family:'Courier New',monospace; }
+
+    /* ---- Canvas ---- */
+    #canvas-container { position:fixed; inset:0; display:none; }
+    #game-canvas {
+      display:block;
+    }
+
+    /* ---- HUD ---- */
+    #hud { position:fixed; inset:0; pointer-events:none; display:none; font-family:'Courier New',monospace; color:#00ff41; }
+
+    #hud-title {
+      position:absolute; top:16px; left:16px;
+      font-size:10px; letter-spacing:3px;
+      color:#ff2200; text-shadow:0 0 8px #ff220066;
+      line-height:1.7;
+    }
+
+    #crosshair {
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      width:18px; height:18px;
+    }
+    #crosshair::before, #crosshair::after {
+      content:''; position:absolute; background:#00ff41; opacity:0.75;
+    }
+    #crosshair::before { width:2px; height:100%; left:50%; transform:translateX(-50%); }
+    #crosshair::after  { width:100%; height:2px; top:50%;  transform:translateY(-50%);  }
+
+    /* Bottom HUD bar */
+    #hud-bottom {
+      position:absolute; bottom:0; left:0; right:0;
+      padding:12px 18px 14px;
+      background:linear-gradient(transparent, rgba(0,0,0,0.88));
+      display:flex; align-items:flex-end; gap:24px;
+    }
+    .hud-stat { display:flex; flex-direction:column; gap:2px; }
+    .hud-label { font-size:8px; letter-spacing:2px; color:#445544; text-transform:uppercase; }
+    .hud-value { font-size:26px; font-weight:bold; color:#00ff41; text-shadow:0 0 8px #00ff41; line-height:1; }
+    .hud-value.warn   { color:#ffaa00; text-shadow:0 0 8px #ffaa00; }
+    .hud-value.danger { color:#ff2200; text-shadow:0 0 8px #ff2200; animation:pulse-danger 0.5s step-end infinite; }
+    @keyframes pulse-danger { 50% { opacity:0.6; } }
+
+    /* Minimap */
+    #minimap {
+      position:absolute; top:14px; right:14px;
+      width:120px; height:120px;
+      border:1px solid #00ff4122;
+      background:rgba(0,0,0,0.6);
+      overflow:hidden;
+    }
+    #minimap canvas { width:100%; height:100%; image-rendering:pixelated; }
+    #minimap-label {
+      position:absolute; bottom:2px; left:0; right:0;
+      text-align:center; font-size:7px; letter-spacing:1px; color:#223322;
+    }
+
+    /* Controls hint */
+    #controls-hint {
+      position:absolute; bottom:78px; left:50%; transform:translateX(-50%);
+      font-size:9px; color:#333; letter-spacing:2px; text-align:center;
+      animation:fadeout 5s forwards; animation-delay:4s; white-space:nowrap;
+    }
+    @keyframes fadeout { to { opacity:0; } }
+
+    /* Damage overlay */
+    #damage-overlay {
+      position:fixed; inset:0; pointer-events:none;
+      border:0px solid #ff2200; transition:all 0.08s; z-index:40;
+    }
+
+    /* Lock prompt */
+    #lock-prompt {
+      position:fixed; inset:0; background:rgba(0,0,0,0.88);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:50; color:#00ff41; font-family:'Courier New',monospace; cursor:pointer;
+    }
+    #lock-prompt .big   { font-size:16px; letter-spacing:4px; margin-bottom:10px; }
+    #lock-prompt .small { font-size:10px; color:#445544; letter-spacing:2px; }
+    #lock-prompt .key   { display:inline-block; border:1px solid #223322; padding:3px 8px; margin:2px; color:#557755; }
+
+    /* Boot screen */
+    #boot-screen {
+      position:fixed; inset:0; background:#000;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:100; color:#00ff41; font-size:12px; padding:40px;
+    }
+    #boot-screen .logo { font-size:24px; font-weight:bold; letter-spacing:8px; color:#ff2200; text-shadow:0 0 20px #ff2200; margin-bottom:6px; }
+    #boot-screen .subtitle { font-size:10px; letter-spacing:4px; color:#556655; margin-bottom:36px; }
+    #boot-log { width:100%; max-width:580px; height:190px; overflow:hidden; display:flex; flex-direction:column; gap:2px; }
+    .boot-line { opacity:0; transition:opacity 0.1s; }
+    .boot-line.ok   { color:#00ff41; }
+    .boot-line.warn { color:#ffaa00; }
+    .boot-line.err  { color:#ff2200; }
+    .boot-line.info { color:#0088ff; }
+    #boot-prompt { margin-top:22px; color:#00ff41; font-size:14px; animation:blink 1s step-end infinite; display:none; }
+
+    @keyframes blink { 50% { opacity:0; } }
+
+    /* Weapon strip */
+    #weapon-strip {
+      position:absolute; bottom:68px; left:18px;
+      display:flex; gap:5px; pointer-events:none;
+    }
+
+    /* Coords — dev info */
+    #hud-coords {
+      position:absolute; top:44px; left:16px;
+      font-size:9px; color:#1a2a1a; line-height:1.6;
+    }
+
+    /* Toast notification — used by objectives, checkpoints, pickups */
+    @keyframes objToast {
+      0%   { opacity:1; transform:translateX(-50%) translateY(0); }
+      70%  { opacity:1; transform:translateX(-50%) translateY(-8px); }
+      100% { opacity:0; transform:translateX(-50%) translateY(-20px); }
+    }
+
+    /* Mobile gate */
+    #mobile-gate {
+      position:fixed; inset:0; background:#000;
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      z-index:1000; font-family:'Courier New',monospace; text-align:center;
+      padding:40px;
+    }
+    #mobile-gate .mg-title {
+      font-size:16px; letter-spacing:4px; color:#ff2200;
+      text-shadow:0 0 12px #ff220066; margin-bottom:20px;
+    }
+    #mobile-gate .mg-sub {
+      font-size:10px; letter-spacing:2px; color:#445544;
+      line-height:2.0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Mobile / touch gate — shown by JS if pointer lock unavailable -->
+  <div id="mobile-gate">
+    <div class="mg-title">HARDWARE INCOMPATIBLE</div>
+    <div class="mg-sub">
+      This system requires a keyboard and mouse.<br>
+      Deploy from a desktop terminal.
+    </div>
+  </div>
+
+  <!-- Boot sequence -->
+  <div id="boot-screen">
+    <div class="logo">DR DOOM</div>
+    <div class="subtitle">DISASTER RECOVERY: THE GAME — v1.0.0</div>
+    <div id="boot-log"></div>
+    <div id="boot-prompt">▸ CLICK OR PRESS ENTER TO CONTINUE</div>
+  </div>
+
+  <!-- Game canvas -->
+  <div id="canvas-container">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <!-- Pointer lock prompt -->
+  <div id="lock-prompt" style="display:none;">
+    <div class="big">▸ CLICK TO ENGAGE</div>
+    <div class="small">POINTER LOCK — COMBAT SYSTEMS ACTIVE</div>
+    <br>
+    <div class="small">
+      <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> MOVE &nbsp;
+      <span class="key">MOUSE</span> LOOK &nbsp;
+      <span class="key">E</span> INTERACT &nbsp;
+      <span class="key">1-7</span> WEAPONS &nbsp;
+      <span class="key">ESC</span> PAUSE
+    </div>
+  </div>
+
+  <!-- HUD overlay -->
+  <div id="hud">
+    <div id="hud-title">DR DOOM // LEVEL 01</div>
+    <div id="crosshair"></div>
+    <div id="hud-coords"></div>
+
+    <!-- Minimap -->
+    <div id="minimap">
+      <canvas id="minimap-canvas" width="120" height="120"></canvas>
+      <div id="minimap-label">NETWORK TOPOLOGY</div>
+    </div>
+
+    <div id="controls-hint">
+      WASD — MOVE &nbsp;|&nbsp; MOUSE — LOOK &nbsp;|&nbsp; E — INTERACT &nbsp;|&nbsp; 1-7 — WEAPONS &nbsp;|&nbsp; ESC — PAUSE
+    </div>
+
+    <div id="weapon-strip"></div>
+
+    <div id="hud-bottom">
+      <div class="hud-stat">
+        <div class="hud-label">UPTIME %</div>
+        <div class="hud-value" id="stat-health">100</div>
+      </div>
+      <div class="hud-stat">
+        <div class="hud-label">REDUNDANCY</div>
+        <div class="hud-value" id="stat-armor" style="font-size:16px;padding-top:6px;">RAID-6</div>
+      </div>
+      <!-- Face cam injected here by FaceCam class -->
+      <div class="hud-stat">
+        <div class="hud-label">STORAGE</div>
+        <div class="hud-value" id="stat-ammo">∞</div>
+      </div>
+      <div class="hud-stat" style="margin-left:auto;">
+        <div class="hud-label">WEAPON</div>
+        <div class="hud-value" style="font-size:13px;padding-top:8px;letter-spacing:1px;" id="stat-weapon">— UNARMED —</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Damage overlay -->
+  <div id="damage-overlay"></div>
+
+  <!-- No-JS fallback -->
+  <noscript>
+    <div style="
+      position:fixed; inset:0; background:#000;
+      display:flex; align-items:center; justify-content:center;
+      font-family:'Courier New',monospace; font-size:12px;
+      letter-spacing:3px; color:#ff2200; text-align:center;
+      padding:40px;
+    ">
+      BOOT FAILURE — JavaScript required to initialize DR systems.
+    </div>
+  </noscript>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
