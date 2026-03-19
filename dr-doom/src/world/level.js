@@ -228,7 +228,7 @@ export class Level {
         if (ds.t <= 0) { ds.open = false; ds.closing = false; }
       }
       ds.mesh.position.y = WALL_H/2 + ds.t * (WALL_H + 0.3);
-      ds.collCell.active = ds.t < 0.4;
+      ds.collCell.active = ds.t < 0.05;
     });
   }
 
