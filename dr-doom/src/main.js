@@ -265,6 +265,7 @@ function launchGame() {
   let prevCount   = enemies.getEnemyCount();
   let musicStateTimer = 0;
   const enemySoundTimers = new Map();
+  const enemySoundNextDelay = new Map();
 
   const inBossFight = () =>
     (rkArena._active  && !rkArena._bossDefeated)  ||
@@ -324,8 +325,10 @@ function launchGame() {
         enemies.getAllEnemyEntities().forEach(e => {
           if (e.isDead) return;
           const last = enemySoundTimers.get(e) ?? 0;
-          if (elapsed - last < 3 + Math.random() * 4) return;
+          const next = enemySoundNextDelay.get(e) ?? (3 + Math.random() * 4);
+          if (elapsed - last < next) return;
           enemySoundTimers.set(e, elapsed);
+          enemySoundNextDelay.set(e, 3 + Math.random() * 4);
           if (!audio.ready) return;
           if      (e.type === 'corruption_crawler')                     EnemySounds.crawlerIdle(e.position.x, 0.5, e.position.z);
           else if (e.type === 'ransomware_wraith' && Math.random()>0.5) EnemySounds.wraithAlert(e.position.x, 0.5, e.position.z);
@@ -335,7 +338,7 @@ function launchGame() {
 
         // Purge dead enemies from the sound timer map to prevent memory leak
         for (const key of enemySoundTimers.keys()) {
-          if (key.isDead) enemySoundTimers.delete(key);
+          if (key.isDead) { enemySoundTimers.delete(key); enemySoundNextDelay.delete(key); }
         }
 
         objectives.update(player.position, enemies.getAllEnemyEntities());
@@ -353,7 +356,7 @@ function launchGame() {
     }
 
     level.update(dt);
-    hud.update(player, weapons, elapsed, inBossFight(), enemies.getWaveState());
+    hud.update(player, weapons, elapsed, inBossFight(), enemies.getWaveState(), dt);
     objHUD.update(objectives.getObjectives());
     minimap.update(player.getPosition(), player.yaw, enemies.getAllEnemyEntities());
 

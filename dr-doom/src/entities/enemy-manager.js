@@ -120,6 +120,7 @@ export class EnemyManager {
     this._encryptionBolts   = []; // projectile-like objects from wraiths
     this._corruptionPatches = []; // floor DOT zones
     this._explosions        = []; // death-explosion VFX updated by the game loop
+    this._weaponLockTimer   = 0;  // game-time countdown for weapon lock
 
     // Wave system
     this._waveNum       = 1;   // current wave (1 = initial spawn)
@@ -268,6 +269,14 @@ export class EnemyManager {
       }
     }
 
+    // Weapon lock timer (game-time, pauses correctly)
+    if (this._weaponLockTimer > 0) {
+      this._weaponLockTimer -= dt;
+      if (this._weaponLockTimer <= 0) {
+        player.weaponSystem?.unlock();
+      }
+    }
+
     // Update encryption bolts
     this._updateBolts(dt, player);
 
@@ -393,7 +402,7 @@ export class EnemyManager {
         const ws = player.weaponSystem;
         if (ws) {
           ws.lock();
-          setTimeout(() => { ws.unlock(); }, 2000);
+          this._weaponLockTimer = 2.0;
         }
         b.mesh.geometry.dispose();
         b.mesh.material.dispose();

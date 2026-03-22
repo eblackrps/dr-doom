@@ -5,6 +5,7 @@ export class ProjectileManager {
     this.scene = scene;
     this._projectiles = [];
     this._traces = [];
+    this._vfx = []; // generic visual effects updated by game loop
   }
 
   spawn({ position, direction, speed, damage, color, scale, type, onHit }) {
@@ -36,7 +37,30 @@ export class ProjectileManager {
     this._traces.push({ line, geo, mat, life: 0.08 });
   }
 
+  // Spawn a timed visual effect (mesh + optional light) managed by the game loop.
+  // `onTick(vfx, progress)` is called each frame with progress 0→1 over `duration`.
+  spawnVFX({ mesh, light, duration, onTick }) {
+    this.scene.add(mesh);
+    if (light) this.scene.add(light);
+    this._vfx.push({ mesh, light, duration, elapsed: 0, onTick });
+  }
+
   update(dt, level, enemies) {
+    // Update VFX
+    for (let i = this._vfx.length - 1; i >= 0; i--) {
+      const v = this._vfx[i];
+      v.elapsed += dt;
+      const progress = Math.min(v.elapsed / v.duration, 1);
+      v.onTick(v, progress);
+      if (progress >= 1) {
+        this.scene.remove(v.mesh);
+        v.mesh.geometry.dispose();
+        v.mesh.material.dispose();
+        if (v.light) this.scene.remove(v.light);
+        this._vfx.splice(i, 1);
+      }
+    }
+
     // Update hitscan traces
     for (let i = this._traces.length - 1; i >= 0; i--) {
       const t = this._traces[i];

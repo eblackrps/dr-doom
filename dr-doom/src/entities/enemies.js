@@ -54,6 +54,7 @@ export class RansomwareWraith extends Entity {
     });
     this.type = 'ransomware_wraith';
     this._hoverOffset = Math.random() * Math.PI * 2;
+    this._hoverT = 0; // accumulated game time for hover bob
     this.pendingBolts = []; // filled by EnemyManager, rendered as projectiles
   }
 
@@ -78,8 +79,9 @@ export class RansomwareWraith extends Entity {
     } else {
       super._updateChase(dt, player, level);
     }
-    // Hover bob
-    this.position.y = 0.4 + Math.sin(performance.now() * 0.002 + this._hoverOffset) * 0.2;
+    // Hover bob (game time, not wall clock)
+    this._hoverT += dt;
+    this.position.y = 0.4 + Math.sin(this._hoverT * 2 + this._hoverOffset) * 0.2;
   }
 
   _doAttack(player) {

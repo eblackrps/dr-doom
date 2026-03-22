@@ -97,6 +97,8 @@ export class RansomwareKingArena {
     this._active    = false;
     this._bossDefeated = false;
     this._onDefeat  = null;
+    this._bossBolts = []; // game-loop-managed boss bolts
+    this._bossWeaponLockTimer = 0;
 
     this._build();
   }
@@ -278,10 +280,36 @@ export class RansomwareKingArena {
       }
     });
 
-    // Encryption bolts
+    // Encryption bolts — spawn
     if (this.boss.pendingBolts.length > 0) {
       this.boss.pendingBolts.forEach(b => this._spawnBolt(b.from, b.target, player));
       this.boss.pendingBolts = [];
+    }
+
+    // Update boss bolts (game-loop managed)
+    for (let i = this._bossBolts.length - 1; i >= 0; i--) {
+      const b = this._bossBolts[i];
+      b.life -= dt;
+      b.mesh.position.addScaledVector(b.dir, b.speed * dt);
+      b.mesh.rotation.y += dt * 5;
+      if (b.mesh.position.distanceTo(b.player.position) < 0.8) {
+        player.takeDamage(12, 'encryption');
+        const ws = player.weaponSystem;
+        if (ws) { ws.lock(); this._bossWeaponLockTimer = 2.5; }
+        b.life = 0;
+      }
+      if (b.life <= 0) {
+        this.scene.remove(b.mesh);
+        b.geo.dispose();
+        b.mat.dispose();
+        this._bossBolts.splice(i, 1);
+      }
+    }
+
+    // Boss weapon lock timer
+    if (this._bossWeaponLockTimer > 0) {
+      this._bossWeaponLockTimer -= dt;
+      if (this._bossWeaponLockTimer <= 0) player.weaponSystem?.unlock();
     }
 
     // Death check
@@ -345,22 +373,7 @@ export class RansomwareKingArena {
     dir.y = 0;
     dir.normalize();
 
-    let life = 3.0;
-    let _last = performance.now();
-    const tick = (now) => {
-      const dt = (now - _last) / 1000; _last = now;
-      life -= dt;
-      mesh.position.addScaledVector(dir, 0.15);
-      mesh.rotation.y += 0.1;
-      if (mesh.position.distanceTo(player.position) < 0.8) {
-        player.weaponSystem?.current?.lock?.();
-        setTimeout(() => player.weaponSystem?.current?.unlock?.(), 2500);
-        life = 0;
-      }
-      if (life > 0) requestAnimationFrame(tick);
-      else { this.scene.remove(mesh); geo.dispose(); }
-    };
-    requestAnimationFrame(tick);
+    this._bossBolts.push({ mesh, geo, mat, dir, speed: 9, life: 3.0, player });
   }
 
   _onBossDefeated(player) {
@@ -419,6 +432,7 @@ export class CascadeTitanArena {
     this._lightsOut    = false;
     this._ambientLight = null;
     this._elapsed      = 0;
+    this._titanVFX     = []; // game-loop-managed VFX (explosions, sparks)
 
     this._build();
   }
@@ -529,6 +543,25 @@ export class CascadeTitanArena {
       this._onBossDefeated(player);
     }
 
+    // Update VFX (explosions, sparks) — game loop managed
+    for (let i = this._titanVFX.length - 1; i >= 0; i--) {
+      const v = this._titanVFX[i];
+      v.life -= dt;
+      const p = 1 - v.life / v.duration;
+      if (v.mesh.material.opacity !== undefined) {
+        v.mesh.scale.setScalar(1 + p * 20);
+        v.mesh.material.opacity = Math.max(0, (1 - p) * 0.8);
+      }
+      if (v.light) v.light.intensity = Math.max(0, (1 - p) * 8);
+      if (v.life <= 0) {
+        this.scene.remove(v.mesh);
+        v.geo.dispose();
+        v.mat.dispose();
+        if (v.light) this.scene.remove(v.light);
+        this._titanVFX.splice(i, 1);
+      }
+    }
+
     this.pickups.update(dt, player);
   }
 
@@ -559,17 +592,17 @@ export class CascadeTitanArena {
 
   _spawnSparks() {
     for (let i = 0; i < 5; i++) {
-      const spark = new THREE.Mesh(
-        new THREE.BoxGeometry(0.05, 0.05, 0.05),
-        new THREE.MeshBasicMaterial({ color: 0xffff00 })
-      );
+      const geo = new THREE.BoxGeometry(0.05, 0.05, 0.05);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const spark = new THREE.Mesh(geo, mat);
       spark.position.set(
         this.ORIGIN_X + Math.random() * this.WIDTH * TILE,
         0.5 + Math.random() * 2,
         this.ORIGIN_Z + Math.random() * this.DEPTH * TILE
       );
       this.scene.add(spark);
-      setTimeout(() => this.scene.remove(spark), 300 + Math.random() * 500);
+      const life = 0.3 + Math.random() * 0.5;
+      this._titanVFX.push({ mesh: spark, light: null, geo, mat, life, duration: life });
     }
   }
 
@@ -582,18 +615,7 @@ export class CascadeTitanArena {
     const l = new THREE.PointLight(0xff4400, 8, 8, 2);
     l.position.copy(s.position);
     this.scene.add(l);
-    let life = 0.6;
-    let _last = performance.now();
-    const tick = (now) => {
-      const dt = (now - _last) / 1000; _last = now;
-      life -= dt;
-      s.scale.setScalar(1 + (1 - life/0.6) * 20);
-      s.material.opacity = Math.max(0, life/0.6 * 0.8);
-      l.intensity = Math.max(0, life/0.6 * 8);
-      if (life > 0) requestAnimationFrame(tick);
-      else { this.scene.remove(s); this.scene.remove(l); geo.dispose(); }
-    };
-    requestAnimationFrame(tick);
+    this._titanVFX.push({ mesh: s, light: l, geo, mat, life: 0.6, duration: 0.6 });
   }
 
   _onBossDefeated(player) {

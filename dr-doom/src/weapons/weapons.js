@@ -96,8 +96,9 @@ export class Weapon {
     if (this._recoilDir === 1) {
       this._recoilT = Math.max(0, this._recoilT - dt * RECOIL_SPEED * 0.5);
       if (this._recoilT <= 0) this._recoilDir = -1;
-    } else {
+    } else if (this._recoilDir === -1) {
       this._recoilT = Math.min(1, this._recoilT + dt * RECOIL_SPEED);
+      if (this._recoilT >= 1) this._recoilDir = 0;
     }
   }
 
@@ -151,6 +152,11 @@ export class Weapon {
 }
 
 
+// Returns the damageable entity (enemy or boss) attached to a raycast hit, or null.
+function _hitTarget(hit) {
+  return hit.object.userData.enemy || hit.object.userData.boss || null;
+}
+
 // ---- Hitscan helper ----
 
 function castHitscan(camera, scene, range, spread = 0) {
@@ -172,7 +178,7 @@ function castHitscan(camera, scene, range, spread = 0) {
   return hits.filter(h =>
     h.distance > 0.3 &&
     h.distance < range &&
-    (h.object.userData.enemy || h.object.userData.isWall)
+    (h.object.userData.enemy || h.object.userData.boss || h.object.userData.isWall)
   );
 }
 
@@ -247,11 +253,10 @@ export class SnapshotPistol extends Weapon {
 
     projectileManager.spawnTrace(muzzleWorld, endPoint, 0x00ff88);
 
-    if (hits.length > 0 && hits[0].object.userData.enemy) {
-      hits[0].object.userData.enemy.takeDamage(this.damage, 'physical');
-    }
+    const target = hits.length > 0 ? _hitTarget(hits[0]) : null;
+    if (target) target.takeDamage(this.damage, 'physical');
 
-    // Revert flash effect on hit point
+    // Hit flash effect
     if (hits.length > 0) {
       const flash = new THREE.Mesh(
         new THREE.SphereGeometry(0.15, 4, 4),
@@ -259,7 +264,7 @@ export class SnapshotPistol extends Weapon {
       );
       flash.position.copy(hits[0].point);
       scene.add(flash);
-      setTimeout(() => scene.remove(flash), 80);
+      setTimeout(() => { scene.remove(flash); flash.geometry.dispose(); flash.material.dispose(); }, 80);
     }
   }
 }
@@ -343,9 +348,8 @@ export class ReplicationShotgun extends Weapon {
 
       projectileManager.spawnTrace(muzzleWorld, endPoint, 0xff8800);
 
-      if (hits.length > 0 && hits[0].object.userData.enemy) {
-        hits[0].object.userData.enemy.takeDamage(this.damage, 'physical');
-      }
+      const pelletTarget = hits.length > 0 ? _hitTarget(hits[0]) : null;
+      if (pelletTarget) pelletTarget.takeDamage(this.damage, 'physical');
     }
 
     // Pump animation
@@ -478,7 +482,7 @@ export class BackupBeam extends Weapon {
     const validHit = hits.find(h =>
       h.distance > 0.3 &&
       h.distance < 25 &&
-      (h.object.userData.enemy || h.object.userData.isWall)
+      (h.object.userData.enemy || h.object.userData.boss || h.object.userData.isWall)
     );
 
     const muzzle = camera.position.clone().addScaledVector(dir, 0.6);
@@ -486,8 +490,9 @@ export class BackupBeam extends Weapon {
 
     this._renderBeam(scene, muzzle, endpoint);
 
-    if (validHit?.object.userData.enemy) {
-      validHit.object.userData.enemy.takeDamage(this.damage * this._stackDamage, 'backup');
+    const beamTarget = validHit ? _hitTarget(validHit) : null;
+    if (beamTarget) {
+      beamTarget.takeDamage(this.damage * this._stackDamage, 'backup');
     }
   }
 
@@ -495,6 +500,7 @@ export class BackupBeam extends Weapon {
     if (this._beamMesh) {
       scene.remove(this._beamMesh);
       this._beamMesh.geometry.dispose();
+      this._beamMesh.material.dispose();
     }
 
     const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
@@ -512,6 +518,7 @@ export class BackupBeam extends Weapon {
     if (this._beamMesh) {
       scene.remove(this._beamMesh);
       this._beamMesh.geometry.dispose();
+      this._beamMesh.material.dispose();
       this._beamMesh = null;
     }
     this._beamActive = false;
@@ -588,38 +595,28 @@ export class FailoverLauncher extends Weapon {
       color: 0xff8800,
       scale: 0.2,
       type: 'failover',
-      onHit: (pos) => this._explode(pos, projectileManager.scene),
+      onHit: (pos) => this._explode(pos, projectileManager.scene, projectileManager),
     });
   }
 
-  _explode(pos, scene) {
-    // Blast radius visual
+  _explode(pos, scene, projectileManager) {
     const blast = new THREE.Mesh(
       new THREE.SphereGeometry(2.5, 8, 8),
       new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.4, wireframe: true })
     );
     blast.position.copy(pos);
-    scene.add(blast);
 
     const light = new THREE.PointLight(0xff8800, 8, 8, 2);
     light.position.copy(pos);
-    scene.add(light);
 
-    let life = 0.3;
-    let _last = performance.now();
-    const tick = (now) => {
-      const dt = (now - _last) / 1000; _last = now;
-      life -= dt;
-      blast.material.opacity = Math.max(0, (life / 0.3) * 0.4);
-      blast.scale.setScalar(1 + (1 - life / 0.3) * 0.5);
-      light.intensity = Math.max(0, (life / 0.3) * 8);
-      if (life > 0) requestAnimationFrame(tick);
-      else {
-        scene.remove(blast); scene.remove(light);
-        blast.geometry.dispose();
-      }
-    };
-    requestAnimationFrame(tick);
+    projectileManager.spawnVFX({
+      mesh: blast, light, duration: 0.3,
+      onTick(v, p) {
+        v.mesh.material.opacity = (1 - p) * 0.4;
+        v.mesh.scale.setScalar(1 + p * 0.5);
+        v.light.intensity = (1 - p) * 8;
+      },
+    });
   }
 }
 
@@ -696,51 +693,48 @@ export class ImmutableRailgun extends Weapon {
       : from.clone().addScaledVector(dir, 60);
 
     // Railgun trace — thick, bright, with glow
-    this._spawnRailTrace(scene, from, endpoint);
+    this._spawnRailTrace(scene, from, endpoint, projectileManager);
 
-    // Damage all enemies hit
+    // Damage all enemies/bosses hit
     allHits.forEach(hit => {
-      if (hit.object.userData.enemy) {
-        hit.object.userData.enemy.takeDamage(this.damage, 'immutable');
-        // Freeze effect (lock) — enemies take damage after 1s delay
-        hit.object.userData.enemy.applyStatus?.('locked', 1.5);
+      const t = _hitTarget(hit);
+      if (t) {
+        t.takeDamage(this.damage, 'immutable');
+        t.applyStatus?.('locked', 1.5);
       }
     });
   }
 
-  _spawnRailTrace(scene, from, to) {
+  _spawnRailTrace(scene, from, to, projectileManager) {
     // Core beam
     const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
     const mat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 1.0 });
     const beam = new THREE.Line(geo, mat);
-    scene.add(beam);
 
-    // Outer glow (wider)
+    // Outer glow
+    const glowGeo = geo.clone();
     const glowMat = new THREE.LineBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.4 });
-    const glow = new THREE.Line(geo.clone(), glowMat);
+    const glow = new THREE.Line(glowGeo, glowMat);
     scene.add(glow);
 
     // Flash light along path
     const midpoint = from.clone().lerp(to, 0.5);
     const light = new THREE.PointLight(0x00ccff, 10, 15, 2);
     light.position.copy(midpoint);
-    scene.add(light);
 
-    let life = 0.25;
-    let _last = performance.now();
-    const tick = (now) => {
-      const dt = (now - _last) / 1000; _last = now;
-      life -= dt;
-      mat.opacity = Math.max(0, life / 0.25);
-      glowMat.opacity = Math.max(0, (life / 0.25) * 0.4);
-      light.intensity = Math.max(0, (life / 0.25) * 10);
-      if (life > 0) requestAnimationFrame(tick);
-      else {
-        scene.remove(beam); scene.remove(glow); scene.remove(light);
-        geo.dispose(); mat.dispose(); glowMat.dispose();
-      }
-    };
-    requestAnimationFrame(tick);
+    projectileManager.spawnVFX({
+      mesh: beam, light, duration: 0.25,
+      onTick(v, p) {
+        mat.opacity = 1 - p;
+        glowMat.opacity = (1 - p) * 0.4;
+        v.light.intensity = (1 - p) * 10;
+        if (p >= 1) {
+          scene.remove(glow);
+          glowGeo.dispose();
+          glowMat.dispose();
+        }
+      },
+    });
   }
 }
 
@@ -832,16 +826,16 @@ export class CDPChaingun extends Weapon {
 
     projectileManager.spawnTrace(from, to, 0x00ff41);
 
-    if (hits.length > 0 && hits[0].object.userData.enemy) {
-      const enemy = hits[0].object.userData.enemy;
-      enemy.takeDamage(this.damage, 'cdp');
+    const cdpTarget = hits.length > 0 ? _hitTarget(hits[0]) : null;
+    if (cdpTarget) {
+      cdpTarget.takeDamage(this.damage, 'cdp');
 
       // CDP: auto-restore kill after 30 hits
-      const count = (this._hitCounters.get(enemy) ?? 0) + 1;
-      this._hitCounters.set(enemy, count);
+      const count = (this._hitCounters.get(cdpTarget) ?? 0) + 1;
+      this._hitCounters.set(cdpTarget, count);
       if (count >= 30) {
-        enemy.takeDamage(9999, 'cdp_restore');
-        this._hitCounters.delete(enemy);
+        cdpTarget.takeDamage(9999, 'cdp_restore');
+        this._hitCounters.delete(cdpTarget);
       }
     }
   }
@@ -924,39 +918,28 @@ export class BFR9000 extends Weapon {
       color: 0x00ff41,
       scale: 0.45,
       type: 'bfr',
-      onHit: (pos) => this._detonate(pos, projectileManager.scene),
+      onHit: (pos) => this._detonate(pos, projectileManager.scene, projectileManager),
     });
   }
 
-  _detonate(pos, scene) {
-    // Massive green restoration wave
+  _detonate(pos, scene, projectileManager) {
     const wave = new THREE.Mesh(
       new THREE.SphereGeometry(0.1, 12, 12),
-      new THREE.MeshBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0.7, wireframe: false })
+      new THREE.MeshBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0.7 })
     );
     wave.position.copy(pos);
-    scene.add(wave);
 
     const light = new THREE.PointLight(0x00ff41, 15, 20, 2);
     light.position.copy(pos);
-    scene.add(light);
 
-    let life = 0.6;
     const maxRadius = 6;
-    let _last = performance.now();
-    const tick = (now) => {
-      const dt = (now - _last) / 1000; _last = now;
-      life -= dt;
-      const progress = 1 - (life / 0.6);
-      wave.scale.setScalar(1 + progress * maxRadius / 0.1);
-      wave.material.opacity = Math.max(0, (life / 0.6) * 0.5);
-      light.intensity = Math.max(0, (life / 0.6) * 15);
-      if (life > 0) requestAnimationFrame(tick);
-      else {
-        scene.remove(wave); scene.remove(light);
-        wave.geometry.dispose();
-      }
-    };
-    requestAnimationFrame(tick);
+    projectileManager.spawnVFX({
+      mesh: wave, light, duration: 0.6,
+      onTick(v, p) {
+        v.mesh.scale.setScalar(1 + p * maxRadius / 0.1);
+        v.mesh.material.opacity = (1 - p) * 0.5;
+        v.light.intensity = (1 - p) * 15;
+      },
+    });
   }
 }

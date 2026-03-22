@@ -40,7 +40,7 @@ export class HUD {
     });
   }
 
-  update(player, weapons, elapsed, isBossFight = false, waveState = null) {
+  update(player, weapons, elapsed, isBossFight = false, waveState = null, dt = 1/60) {
     const hp = Math.max(0, Math.floor(player.health));
     if (hp !== this._lastHealth) {
       this.health.textContent = hp + '%';
@@ -98,7 +98,7 @@ export class HUD {
     }
 
     // Face cam
-    this.faceCam?.update(1/60, player, isBossFight);
+    this.faceCam?.update(dt, player, isBossFight);
 
     // Wave indicator
     if (this._waveNumEl && waveState) {
