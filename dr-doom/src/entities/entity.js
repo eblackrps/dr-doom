@@ -61,10 +61,20 @@ export class Entity {
     // _stuckTimer: how long the entity has been moving less than expected
     // _steerAngle: current rotational offset applied to the desired direction
     // _steerTimer: how long left in the current steer maneuver
-    this._prevPos      = position.clone();
-    this._stuckTimer   = 0;
-    this._steerAngle   = 0;
-    this._steerTimer   = 0;
+    this._prevPos          = position.clone();
+    this._stuckTimer       = 0;
+    this._steerAngle       = 0;
+    this._steerTimer       = 0;
+    // Set to true whenever _moveToward runs; cleared when entity stops moving so that
+    // the first _moveToward call after an ATTACK/IDLE pause re-syncs _prevPos instead
+    // of counting the stand-still as a stuck frame.
+    this._didMoveLastFrame = false;
+
+    // Sight memory: how many seconds we keep chasing after losing line-of-sight.
+    this._sightMemory = 0;
+
+    // Seconds remaining on the white→red hit-flash applied to the sprite.
+    this._hitFlash = 0;
   }
 
   // ---- Damage ----
@@ -85,6 +95,7 @@ export class Entity {
       if (this.state === AI_STATE.IDLE || this.state === AI_STATE.PATROL) {
         this.state = AI_STATE.CHASE;
       }
+      this._hitFlash = 0.12; // trigger white→red sprite flash
     }
   }
 
@@ -122,7 +133,19 @@ export class Entity {
     const _dx = player.position.x - this.position.x;
     const _dz = player.position.z - this.position.z;
     const distToPlayer = Math.sqrt(_dx * _dx + _dz * _dz);
-    const canSee = distToPlayer < this.detectionRange;
+
+    // Line-of-sight check: only detect the player when there is no wall in the way.
+    // level may be null in rare subclass overrides, so fall back to pure distance.
+    const inRange = distToPlayer < this.detectionRange;
+    const hasLOS  = inRange && (level ? level.hasLOS(this.position, player.position) : true);
+    // Sight memory: keep chasing for 2 s after losing LOS so ducking around a corner
+    // doesn't instantly reset every enemy in the room.
+    if (hasLOS) {
+      this._sightMemory = 2.0;
+    } else {
+      this._sightMemory = Math.max(0, this._sightMemory - dt);
+    }
+    const canSee = hasLOS || this._sightMemory > 0;
 
     switch (this.state) {
       case AI_STATE.IDLE:
@@ -154,6 +177,7 @@ export class Entity {
         break;
 
       case AI_STATE.STUNNED:
+        this._didMoveLastFrame = false;
         this._stunTimer -= dt;
         if (this._stunTimer <= 0) this.state = AI_STATE.CHASE;
         break;
@@ -177,15 +201,26 @@ export class Entity {
   }
 
   _updateIdle(dt) {
+    this._didMoveLastFrame = false;
     this.velocity.set(0, 0, 0);
   }
 
   _updatePatrol(dt, level) {
     if (this._patrolPoints.length === 0) return;
+
+    // Pause at each waypoint before walking on — gives a guard-on-watch feel.
+    if (this._patrolTimer > 0) {
+      this._patrolTimer -= dt;
+      this._didMoveLastFrame = false;
+      this.velocity.set(0, 0, 0);
+      return;
+    }
+
     const target = this._patrolPoints[this._patrolIndex];
     const dist = this.position.distanceTo(target);
     if (dist < 0.5) {
       this._patrolIndex = (this._patrolIndex + 1) % this._patrolPoints.length;
+      this._patrolTimer = 0.5 + Math.random() * 1.5; // pause 0.5–2 s at each stop
     } else {
       this._moveToward(target, this.speed * 0.5, dt, level);
     }
@@ -196,6 +231,7 @@ export class Entity {
   }
 
   _updateAttack(dt, player) {
+    this._didMoveLastFrame = false;
     this.velocity.set(0, 0, 0);
     if (this._attackCooldown <= 0) {
       this._doAttack(player);
@@ -224,6 +260,16 @@ export class Entity {
     // Measure how far the entity actually moved since the last call.
     // If it moved less than 25% of the expected distance, it's probably
     // wedged into a wall or corner.
+    //
+    // Guard: if _moveToward wasn't called last frame (e.g. entity just left ATTACK
+    // or STUNNED state) _prevPos is stale, so re-sync it before measuring to avoid
+    // a phantom stuck tick on the first frame of movement.
+    if (!this._didMoveLastFrame) {
+      this._prevPos.copy(this.position);
+      this._stuckTimer = 0;
+    }
+    this._didMoveLastFrame = true;
+
     const movedDist = Math.hypot(
       this.position.x - this._prevPos.x,
       this.position.z - this._prevPos.z

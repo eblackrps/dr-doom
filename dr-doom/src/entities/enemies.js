@@ -61,10 +61,20 @@ export class RansomwareWraith extends Entity {
     // Wraith keeps mid-range — strafe rather than close in
     const dist = this.position.distanceTo(player.position);
     if (dist < 5) {
-      // Back away
+      // Back away — use axis-separated collision checks (same pattern as _moveToward)
+      // so the wraith can't phase through server racks when retreating.
       const away = this.position.clone().sub(player.position).normalize();
-      const delta = away.multiplyScalar(this.speed * dt);
-      this.position.add(delta);
+      const step = this.speed * dt;
+
+      const testX = this.position.clone();
+      testX.x += away.x * step;
+      if (!level.collidesAABB(testX, 0.35, 1.8)) this.position.x = testX.x;
+
+      const testZ = this.position.clone();
+      testZ.z += away.z * step;
+      if (!level.collidesAABB(testZ, 0.35, 1.8)) this.position.z = testZ.z;
+
+      this.velocity.copy(away).multiplyScalar(this.speed);
     } else {
       super._updateChase(dt, player, level);
     }
@@ -73,12 +83,12 @@ export class RansomwareWraith extends Entity {
   }
 
   _doAttack(player) {
-    // Queue an encryption bolt to be spawned by EnemyManager
+    // Queue an encryption bolt — damage is applied on contact, not at fire time.
     this.pendingBolts.push({
-      from: this.position.clone(),
+      from:   this.position.clone(),
       target: player.position.clone(),
+      damage: this.damage,
     });
-    player.takeDamage(this.damage, DAMAGE_TYPES.ENCRYPTION);
   }
 
   _getAttackCooldown() { return 1.8; }
@@ -219,9 +229,11 @@ export class LatencyLeech extends Entity {
 
   update(dt, player, level) {
     if (this.isAttached) {
-      // Follow player exactly
-      this.position.copy(player.position);
-      this.position.y = 0;
+      // Trail just behind the player so the billboard doesn't fill the screen.
+      // player.yaw forward = (-sin, 0, -cos), so behind = (+sin, 0, +cos).
+      this.position.x = player.position.x + Math.sin(player.yaw) * 0.4;
+      this.position.z = player.position.z + Math.cos(player.yaw) * 0.4;
+      this.position.y = 0.01; // floor level — sprite mesh offset handles visual height
       this._attachTimer -= dt;
       if (this._attachTimer <= 0) {
         this.isAttached = false;
@@ -268,16 +280,28 @@ export class ConfigDriftSpecter extends Entity {
       this._morphT = Math.min(1, this._morphT + dt / this._morphTimer);
     }
 
-    // Only become hostile after morphing
+    // Only become hostile after morphing.
+    // Still tick maintenance so status effects expire and cooldowns count down
+    // even while the specter appears friendly.
     if (this._morphT < 0.5 && this.state === AI_STATE.IDLE) {
-      // Look friendly — don't chase yet
+      this._updateStatuses(dt);
+      this._attackCooldown = Math.max(0, this._attackCooldown - dt);
+      this._didMoveLastFrame = false;
       return;
     }
 
-    // Spawn clone when partially morphed
+    // Spawn clone when partially morphed — place it at a random position near the
+    // player rather than stacking on top of this entity.
     this._cloneCooldown = Math.max(0, this._cloneCooldown - dt);
     if (!this.isClone && this._morphT > 0.7 && this._cloneCooldown <= 0 && dist < 12) {
-      this.pendingClones.push(this.position.clone());
+      const angle   = Math.random() * Math.PI * 2;
+      const radius  = 3 + Math.random() * 4;
+      const clonePos = new THREE.Vector3(
+        player.position.x + Math.cos(angle) * radius,
+        0.01,
+        player.position.z + Math.sin(angle) * radius,
+      );
+      this.pendingClones.push(clonePos);
       this._cloneCooldown = 10.0;
     }
 

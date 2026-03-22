@@ -90,7 +90,10 @@ export class PickupManager {
   _despawn(index) {
     const p = this._pickups[index];
     this.scene.remove(p.mesh);
-    p.mesh.geometry?.dispose();
+    p.mesh.traverse(child => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) child.material.dispose();
+    });
     this._pickups.splice(index, 1);
   }
 

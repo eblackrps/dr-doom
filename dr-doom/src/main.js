@@ -353,9 +353,9 @@ function launchGame() {
     }
 
     level.update(dt);
-    hud.update(player, weapons, elapsed, inBossFight());
+    hud.update(player, weapons, elapsed, inBossFight(), enemies.getWaveState());
     objHUD.update(objectives.getObjectives());
-    minimap.update(player.getPosition(), enemies.getAllEnemyEntities());
+    minimap.update(player.getPosition(), player.yaw, enemies.getAllEnemyEntities());
 
     if (hudTitle) {
       const count = enemies.getEnemyCount();

@@ -733,6 +733,30 @@ export class Level {
     return 0;
   }
 
+  // Returns true if there is an unobstructed line of sight between two XZ positions.
+  // Marches along the segment in 1-unit steps and checks each sample against solid cells.
+  hasLOS(from, to) {
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.001) return true;
+    const nx = dx / dist;
+    const nz = dz / dist;
+    const testY = 1.0; // mid-body height — walls span 0–4 so this always intersects
+    for (let d = 1.0; d < dist - 0.5; d += 1.0) {
+      const tx = from.x + nx * d;
+      const tz = from.z + nz * d;
+      for (const cell of this._solidCells) {
+        if (cell.dynamic && !cell.active) continue;
+        if (cell.isStep) continue;
+        if (tx > cell.minX && tx < cell.maxX &&
+            testY > cell.minY && testY < cell.maxY &&
+            tz > cell.minZ && tz < cell.maxZ) return false;
+      }
+    }
+    return true;
+  }
+
   update(dt) {
     this.updateDoors(dt);
   }

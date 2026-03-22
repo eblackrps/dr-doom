@@ -36,10 +36,15 @@ export class WeaponSystem {
     this.currentSlot = 0; // index into weapons array
     this._pendingSlot = -1;
     this._switchCooldown = 0;
+    this._locked = false;  // true while an encryption bolt effect is active
 
     // Start with weapon 1 drawn
     this.weapons[0].switchTo();
   }
+
+  // Called by encryption bolt hit — prevents firing for a short window.
+  lock()   { this._locked = true;  }
+  unlock() { this._locked = false; }
 
   get current() {
     return this.weapons[this.currentSlot];
@@ -54,9 +59,11 @@ export class WeaponSystem {
     this._handleSwitchInput(input);
     this._handleScrollWheel(input);
 
-    // Update all weapons (only current fires, but all animate switch state)
+    // Update all weapons (only current fires, but all animate switch state).
+    // While locked by an encryption bolt, feed _noInput to the active slot too.
     this.weapons.forEach((w, i) => {
-      w.update(dt, i === this.currentSlot ? input : _noInput, this.ammo, camera, this.projectiles);
+      const activeInput = (i === this.currentSlot && !this._locked) ? input : _noInput;
+      w.update(dt, activeInput, this.ammo, camera, this.projectiles);
     });
 
     // Update projectiles

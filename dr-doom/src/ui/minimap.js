@@ -1,6 +1,21 @@
 // Minimap — wire-frame network topology view of the level
 // Drawn on the #minimap-canvas element each frame
 
+// Draw a filled triangle centred at (cx, cy) pointing in the direction given by
+// yaw (entity convention: forward = (sin yaw, cos yaw) in canvas space).
+// tip   — distance from centre to tip
+// wing  — half-width of the base (base is perpendicular, one `wing` behind centre)
+function _tri(ctx, cx, cy, yaw, tip, wing) {
+  const fdx =  Math.sin(yaw);
+  const fdy =  Math.cos(yaw);
+  ctx.beginPath();
+  ctx.moveTo(cx + fdx * tip,                    cy + fdy * tip);
+  ctx.lineTo(cx - fdx * wing - fdy * wing,      cy - fdy * wing + fdx * wing);
+  ctx.lineTo(cx - fdx * wing + fdy * wing,      cy - fdy * wing - fdx * wing);
+  ctx.closePath();
+  ctx.fill();
+}
+
 const TILE  = 4;
 const ROWS  = 32;
 const COLS  = 28;
@@ -25,7 +40,7 @@ export class Minimap {
     this._cellH  = this._size / ROWS;
   }
 
-  update(playerPos, enemies) {
+  update(playerPos, playerYaw, enemies) {
     if (!this._ctx) return;
     const ctx  = this._ctx;
     const s    = this._size;
@@ -72,26 +87,35 @@ export class Minimap {
       );
     });
 
-    // Enemies — red dots
+    // Enemies — directional triangles.
+    // Yaw convention: forward = (-sin, 0, -cos) in world space.
+    // Canvas mapping: world X → canvas x, world Z → canvas y.
+    // So canvas forward direction = (-sin(yaw), -cos(yaw))... but entities face
+    // the direction their velocity points, stored as atan2(vx, vz), meaning
+    // canvas forward = (sin(yaw), cos(yaw)).
+    // Colour: bright when chasing/attacking, dim when patrolling/idle.
     if (enemies) {
       enemies.forEach(e => {
         if (e.isDead) return;
         const ex = (e.position.x / (COLS * TILE)) * s;
         const ey = (e.position.z / (ROWS * TILE)) * s;
-        ctx.fillStyle = '#ff220099';
-        ctx.fillRect(ex - 1, ey - 1, 2, 2);
+        const alerted = e.state === 'chase' || e.state === 'attack';
+        ctx.fillStyle = alerted ? '#ff2200cc' : '#ff220044';
+        _tri(ctx, ex, ey, e.yaw, 3.5, 2);
       });
     }
 
-    // Player — bright green triangle
+    // Player — bright green directional triangle
     if (playerPos) {
       const px = (playerPos.x / (COLS * TILE)) * s;
       const py = (playerPos.z / (ROWS * TILE)) * s;
+      // Player forward in world space is (-sin yaw, -cos yaw), so add π to flip
+      // the triangle to face the same direction as the camera.
+      const facingYaw = playerYaw + Math.PI;
+      ctx.fillStyle = '#00ff4166';
+      _tri(ctx, px, py, facingYaw, 5, 3);
       ctx.fillStyle = '#00ff41';
-      ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
-      // Glow
-      ctx.fillStyle = '#00ff4144';
-      ctx.fillRect(px - 3, py - 3, 6, 6);
+      _tri(ctx, px, py, facingYaw, 4, 2.5);
     }
   }
 }

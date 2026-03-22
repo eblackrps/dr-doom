@@ -14,6 +14,10 @@ export class HUD {
     this._lastWeapon = '';
     this._lastSlot   = -1;
 
+    this._waveNumEl   = document.getElementById('wave-num');
+    this._waveCountEl = document.getElementById('wave-countdown');
+    this._lastWaveStr = '';
+
     this.faceCam = new FaceCam();
     this._buildWeaponSlots();
   }
@@ -36,7 +40,7 @@ export class HUD {
     });
   }
 
-  update(player, weapons, elapsed, isBossFight = false) {
+  update(player, weapons, elapsed, isBossFight = false, waveState = null) {
     const hp = Math.max(0, Math.floor(player.health));
     if (hp !== this._lastHealth) {
       this.health.textContent = hp + '%';
@@ -95,6 +99,23 @@ export class HUD {
 
     // Face cam
     this.faceCam?.update(1/60, player, isBossFight);
+
+    // Wave indicator
+    if (this._waveNumEl && waveState) {
+      const numText = `WAVE ${waveState.num}`;
+      if (numText !== this._lastWaveStr) {
+        this._waveNumEl.textContent = numText;
+        this._lastWaveStr = numText;
+      }
+      if (this._waveCountEl) {
+        if (waveState.countdown !== null) {
+          this._waveCountEl.textContent = `RESPAWN: ${Math.ceil(waveState.countdown)}s`;
+          this._waveCountEl.style.display = '';
+        } else {
+          this._waveCountEl.style.display = 'none';
+        }
+      }
+    }
 
     // Coords (dev — can be hidden)
     if (this.coords) {

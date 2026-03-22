@@ -80,6 +80,23 @@
       text-align:center; font-size:7px; letter-spacing:1px; color:#223322;
     }
 
+    /* Wave indicator — sits below the minimap */
+    #wave-info {
+      position:absolute; top:142px; right:14px;
+      text-align:right; pointer-events:none;
+      font-family:'Courier New',monospace;
+    }
+    #wave-num {
+      font-size:9px; letter-spacing:2px; color:#224422;
+    }
+    #wave-countdown {
+      font-size:11px; letter-spacing:2px;
+      color:#ff8800; text-shadow:0 0 8px #ff880055;
+      display:none;
+      animation:wave-pulse 0.8s step-end infinite;
+    }
+    @keyframes wave-pulse { 50% { opacity:0.55; } }
+
     /* Controls hint */
     #controls-hint {
       position:absolute; bottom:78px; left:50%; transform:translateX(-50%);
@@ -206,6 +223,12 @@
     <div id="minimap">
       <canvas id="minimap-canvas" width="120" height="120"></canvas>
       <div id="minimap-label">NETWORK TOPOLOGY</div>
+    </div>
+
+    <!-- Wave indicator -->
+    <div id="wave-info">
+      <div id="wave-num"></div>
+      <div id="wave-countdown"></div>
     </div>
 
     <div id="controls-hint">

@@ -4,6 +4,7 @@ export class ProjectileManager {
   constructor(scene) {
     this.scene = scene;
     this._projectiles = [];
+    this._traces = [];
   }
 
   spawn({ position, direction, speed, damage, color, scale, type, onHit }) {
@@ -27,7 +28,28 @@ export class ProjectileManager {
     });
   }
 
+  spawnTrace(from, to, color) {
+    const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 });
+    const line = new THREE.Line(geo, mat);
+    this.scene.add(line);
+    this._traces.push({ line, geo, mat, life: 0.08 });
+  }
+
   update(dt, level, enemies) {
+    // Update hitscan traces
+    for (let i = this._traces.length - 1; i >= 0; i--) {
+      const t = this._traces[i];
+      t.life -= dt;
+      t.mat.opacity = Math.max(0, t.life / 0.08 * 0.7);
+      if (t.life <= 0) {
+        this.scene.remove(t.line);
+        t.geo.dispose();
+        t.mat.dispose();
+        this._traces.splice(i, 1);
+      }
+    }
+
     for (let i = this._projectiles.length - 1; i >= 0; i--) {
       const p = this._projectiles[i];
       p.life -= dt;
@@ -65,6 +87,7 @@ export class ProjectileManager {
     const p = this._projectiles[index];
     this.scene.remove(p.mesh);
     p.mesh.geometry.dispose();
+    p.mesh.material.dispose();
     this._projectiles.splice(index, 1);
   }
 

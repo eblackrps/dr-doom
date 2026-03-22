@@ -176,23 +176,8 @@ function castHitscan(camera, scene, range, spread = 0) {
   );
 }
 
-function spawnHitscanTrace(scene, from, to, color) {
-  const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
-  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 });
-  const line = new THREE.Line(geo, mat);
-  scene.add(line);
-  // Fade and remove
-  let life = 0.08;
-  let _last = performance.now();
-  const tick = (now) => {
-    const dt = (now - _last) / 1000; _last = now;
-    life -= dt;
-    mat.opacity = Math.max(0, life / 0.08 * 0.7);
-    if (life > 0) requestAnimationFrame(tick);
-    else { scene.remove(line); geo.dispose(); mat.dispose(); }
-  };
-  requestAnimationFrame(tick);
-}
+// spawnHitscanTrace is now handled by ProjectileManager.spawnTrace() so that
+// trace fade runs inside the fixed-timestep game loop (pauses correctly).
 
 
 // ---- Weapon 1: Snapshot Pistol ----
@@ -260,7 +245,7 @@ export class SnapshotPistol extends Weapon {
       ? hits[0].point.clone()
       : muzzleWorld.clone().addScaledVector(forward, 30);
 
-    spawnHitscanTrace(scene, muzzleWorld, endPoint, 0x00ff88);
+    projectileManager.spawnTrace(muzzleWorld, endPoint, 0x00ff88);
 
     if (hits.length > 0 && hits[0].object.userData.enemy) {
       hits[0].object.userData.enemy.takeDamage(this.damage, 'physical');
@@ -356,7 +341,7 @@ export class ReplicationShotgun extends Weapon {
         ? hits[0].point.clone()
         : muzzleWorld.clone().addScaledVector(spreadDir, 18);
 
-      spawnHitscanTrace(scene, muzzleWorld, endPoint, 0xff8800);
+      projectileManager.spawnTrace(muzzleWorld, endPoint, 0xff8800);
 
       if (hits.length > 0 && hits[0].object.userData.enemy) {
         hits[0].object.userData.enemy.takeDamage(this.damage, 'physical');
@@ -845,7 +830,7 @@ export class CDPChaingun extends Weapon {
       ? hits[0].point.clone()
       : from.clone().addScaledVector(dir, 20);
 
-    spawnHitscanTrace(scene, from, to, 0x00ff41);
+    projectileManager.spawnTrace(from, to, 0x00ff41);
 
     if (hits.length > 0 && hits[0].object.userData.enemy) {
       const enemy = hits[0].object.userData.enemy;

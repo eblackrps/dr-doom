@@ -14,41 +14,65 @@ import { AI_STATE } from './entity.js';
 
 const TILE = 4;
 
-// Spawn definitions scattered across all 6 rooms
+// Spawn definitions scattered across all 6 rooms.
+// `patrol` is an array of [col, row] waypoints. Enemies with ≥2 waypoints start
+// in PATROL state and walk the loop at half-speed; they switch to CHASE on sight.
 const SPAWN_DEFS = [
   // Main Server Floor — crawlers and wraiths
-  { type: 'corruption_crawler', col: 4,  row: 4  },
-  { type: 'corruption_crawler', col: 8,  row: 7  },
-  { type: 'corruption_crawler', col: 10, row: 3  },
-  { type: 'ransomware_wraith',  col: 7,  row: 5  },
-  { type: 'ransomware_wraith',  col: 3,  row: 9  },
+  { type: 'corruption_crawler', col: 4,  row: 4,
+    patrol: [[2,1],[6,5],[2,9],[6,9]] },
+  { type: 'corruption_crawler', col: 8,  row: 7,
+    patrol: [[6,5],[11,1],[11,9],[6,9]] },
+  { type: 'corruption_crawler', col: 10, row: 3,
+    patrol: [[11,1],[8,2],[8,5],[11,5]] },
+  { type: 'ransomware_wraith',  col: 7,  row: 5,
+    patrol: [[6,2],[11,2],[11,8],[6,8],[2,5]] },
+  { type: 'ransomware_wraith',  col: 3,  row: 9,
+    patrol: [[2,9],[2,5],[2,1],[6,1],[6,9]] },
 
   // Storage Vault — gremlins and leeches
-  { type: 'hardware_gremlin',   col: 17, row: 4  },
-  { type: 'hardware_gremlin',   col: 22, row: 7  },
-  { type: 'latency_leech',      col: 19, row: 9  },
-  { type: 'latency_leech',      col: 25, row: 3  },
+  { type: 'hardware_gremlin',   col: 17, row: 4,
+    patrol: [[15,2],[19,2],[19,8],[15,8]] },
+  { type: 'hardware_gremlin',   col: 22, row: 7,
+    patrol: [[22,2],[26,5],[22,9],[18,5]] },
+  { type: 'latency_leech',      col: 19, row: 9,
+    patrol: [[15,9],[15,5],[19,5],[23,9]] },
+  { type: 'latency_leech',      col: 25, row: 3,
+    patrol: [[26,1],[26,9],[22,5],[19,1]] },
 
   // Network Core — phantoms and specters
-  { type: 'network_phantom',    col: 3,  row: 15 },
-  { type: 'network_phantom',    col: 7,  row: 18 },
-  { type: 'config_drift_specter', col: 5, row: 17 },
-  { type: 'config_drift_specter', col: 9, row: 14 },
+  { type: 'network_phantom',    col: 3,  row: 15,
+    patrol: [[2,13],[2,19],[7,19],[7,13]] },
+  { type: 'network_phantom',    col: 7,  row: 18,
+    patrol: [[9,13],[9,20],[1,20],[1,14]] },
+  { type: 'config_drift_specter', col: 5, row: 17,
+    patrol: [[2,14],[5,14],[9,18],[5,20],[2,19]] },
+  { type: 'config_drift_specter', col: 9, row: 14,
+    patrol: [[10,13],[10,20],[4,20],[4,14],[1,17]] },
 
   // Cold Aisle — mixed
-  { type: 'corruption_crawler', col: 14, row: 15 },
-  { type: 'ransomware_wraith',  col: 16, row: 18 },
-  { type: 'latency_leech',      col: 15, row: 16 },
+  { type: 'corruption_crawler', col: 14, row: 15,
+    patrol: [[14,13],[18,13],[18,19],[14,19]] },
+  { type: 'ransomware_wraith',  col: 16, row: 18,
+    patrol: [[14,14],[18,14],[18,19],[14,19]] },
+  { type: 'latency_leech',      col: 15, row: 16,
+    patrol: [[13,15],[18,15],[18,18],[13,18]] },
 
   // Management Console Room — specters and wraiths
-  { type: 'config_drift_specter', col: 22, row: 15 },
-  { type: 'config_drift_specter', col: 25, row: 18 },
-  { type: 'ransomware_wraith',  col: 23, row: 17 },
+  { type: 'config_drift_specter', col: 22, row: 15,
+    patrol: [[22,13],[26,13],[26,19],[22,19]] },
+  { type: 'config_drift_specter', col: 25, row: 18,
+    patrol: [[21,14],[26,14],[26,20],[21,20]] },
+  { type: 'ransomware_wraith',  col: 23, row: 17,
+    patrol: [[22,13],[26,13],[26,19],[22,19],[21,16]] },
 
   // Emergency Exit Corridor — titan guarding the exit
-  { type: 'cascade_titan',      col: 13, row: 27 },
-  { type: 'hardware_gremlin',   col: 11, row: 25 },
-  { type: 'corruption_crawler', col: 15, row: 26 },
+  { type: 'cascade_titan',      col: 13, row: 27,
+    patrol: [[10,25],[16,25],[16,29],[10,29]] },
+  { type: 'hardware_gremlin',   col: 11, row: 25,
+    patrol: [[9,24],[13,24],[10,28],[9,26]] },
+  { type: 'corruption_crawler', col: 15, row: 26,
+    patrol: [[16,24],[17,26],[16,29],[13,27]] },
 ];
 
 // Sprite sheets cached by type
@@ -78,6 +102,14 @@ function makeEnemy(type, position) {
 // Non-boss spawn types eligible for wave respawns
 const WAVE_POOL = SPAWN_DEFS.filter(d => d.type !== 'cascade_titan');
 
+// Convert a spawn def's patrol [[col,row],...] into THREE.Vector3 world positions.
+function _defPatrol(def) {
+  if (!def.patrol || def.patrol.length < 2) return [];
+  return def.patrol.map(([c, r]) =>
+    new THREE.Vector3(c * TILE + TILE / 2, 0.01, r * TILE + TILE / 2)
+  );
+}
+
 export class EnemyManager {
   constructor(scene, weaponSystem) {
     this.scene         = scene;
@@ -87,6 +119,7 @@ export class EnemyManager {
 
     this._encryptionBolts   = []; // projectile-like objects from wraiths
     this._corruptionPatches = []; // floor DOT zones
+    this._explosions        = []; // death-explosion VFX updated by the game loop
 
     // Wave system
     this._waveNum       = 1;   // current wave (1 = initial spawn)
@@ -106,16 +139,25 @@ export class EnemyManager {
         0.01,
         def.row * TILE + TILE / 2
       );
-      this._spawnEnemy(def.type, pos);
+      const patrol = _defPatrol(def);
+      this._spawnEnemy(def.type, pos, {}, patrol);
     });
   }
 
-  _spawnEnemy(type, position, mults = {}) {
+  _spawnEnemy(type, position, mults = {}, patrolPts = []) {
     const entity = makeEnemy(type, position);
     if (!entity) return;
 
     if (mults.speedMult)  entity.speed  *= mults.speedMult;
     if (mults.damageMult) entity.damage *= mults.damageMult;
+
+    // Assign patrol route and start entity in PATROL state so it moves
+    // immediately rather than standing frozen until the player enters range.
+    if (patrolPts.length >= 2) {
+      entity._patrolPoints = patrolPts;
+      entity._patrolIndex  = Math.floor(Math.random() * patrolPts.length);
+      entity.state         = AI_STATE.PATROL;
+    }
 
     const isBoss = type === 'cascade_titan';
     const sheet  = getSheet(type);
@@ -177,15 +219,16 @@ export class EnemyManager {
       // Handle Wraith encryption bolts
       if (entity.pendingBolts?.length > 0) {
         entity.pendingBolts.forEach(bolt => {
-          this._spawnEncryptionBolt(bolt.from, bolt.target, player);
+          this._spawnEncryptionBolt(bolt.from, bolt.target, player, bolt.damage);
         });
         entity.pendingBolts = [];
       }
 
-      // Handle Config Drift clones
+      // Handle Config Drift clones — validate position before spawning
       if (entity.pendingClones?.length > 0) {
         entity.pendingClones.forEach(pos => {
-          this._spawnEnemy('config_drift_specter_clone', pos);
+          const clear = this._findClearPos(pos, level);
+          if (clear) this._spawnEnemy('config_drift_specter_clone', clear);
         });
         entity.pendingClones = [];
       }
@@ -198,7 +241,6 @@ export class EnemyManager {
 
       // Update position
       group.position.copy(entity.position);
-      group.position.y = entity.position.y;
 
       // Billboard facing
       if (camera) {
@@ -212,10 +254,17 @@ export class EnemyManager {
         sprite.mesh.material.opacity = entity.getVisibility?.() ?? 1.0;
       }
 
-      // Config Drift morph — tint sprite
-      if (entity.type === 'config_drift_specter') {
+      // Sprite colour: hit flash takes priority, then enemy-specific tints.
+      if (entity._hitFlash > 0) {
+        entity._hitFlash = Math.max(0, entity._hitFlash - dt);
+        // Interpolate white → red as the flash fades
+        const t = entity._hitFlash / 0.12;
+        sprite.mesh.material.color.setRGB(1, t * 0.5, t * 0.5);
+      } else if (entity.type === 'config_drift_specter') {
         const m = entity.getMorphT?.() ?? 0;
         sprite.mesh.material.color.setRGB(1, 1 - m * 0.5, 1 - m * 0.8);
+      } else {
+        sprite.mesh.material.color.setRGB(1, 1, 1);
       }
     }
 
@@ -224,6 +273,9 @@ export class EnemyManager {
 
     // Update corruption patches
     this._updatePatches(dt, player);
+
+    // Update explosion VFX
+    this._updateExplosions(dt);
 
     // Update pickups
     this.pickups.update(dt, player);
@@ -245,6 +297,23 @@ export class EnemyManager {
         }
       }
     }
+  }
+
+  // Returns the requested position if it's clear, otherwise tries up to 12 random
+  // offsets within 3 units. Returns null if no clear spot is found (clone skipped).
+  _findClearPos(pos, level) {
+    if (!level.collidesAABB(pos, 0.35, 1.8)) return pos;
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const r = 1.5 + (i % 3) * 0.75; // spiral outward: 1.5, 2.25, 3 units
+      const candidate = new THREE.Vector3(
+        pos.x + Math.cos(angle) * r,
+        pos.y,
+        pos.z + Math.sin(angle) * r,
+      );
+      if (!level.collidesAABB(candidate, 0.35, 1.8)) return candidate;
+    }
+    return null;
   }
 
   _spawnDrops(entity) {
@@ -274,21 +343,28 @@ export class EnemyManager {
     light.position.copy(sphere.position);
     this.scene.add(light);
 
-    let life = 0.5;
-    let _last = performance.now();
-    const tick = (now) => {
-      const dt = (now - _last) / 1000; _last = now;
-      life -= dt;
-      sphere.scale.setScalar(1 + (1 - life / 0.5) * 30);
-      sphere.material.opacity = Math.max(0, life / 0.5 * 0.8);
-      light.intensity = Math.max(0, life / 0.5 * 6);
-      if (life > 0) requestAnimationFrame(tick);
-      else { this.scene.remove(sphere); this.scene.remove(light); geo.dispose(); mat.dispose(); }
-    };
-    requestAnimationFrame(tick);
+    // Tracked by the game loop via _updateExplosions — no separate rAF needed.
+    this._explosions.push({ sphere, light, geo, mat, life: 0.5 });
   }
 
-  _spawnEncryptionBolt(from, target, player) {
+  _updateExplosions(dt) {
+    for (let i = this._explosions.length - 1; i >= 0; i--) {
+      const ex = this._explosions[i];
+      ex.life -= dt;
+      ex.sphere.scale.setScalar(1 + (1 - ex.life / 0.5) * 30);
+      ex.sphere.material.opacity = Math.max(0, ex.life / 0.5 * 0.8);
+      ex.light.intensity = Math.max(0, ex.life / 0.5 * 6);
+      if (ex.life <= 0) {
+        this.scene.remove(ex.sphere);
+        this.scene.remove(ex.light);
+        ex.geo.dispose();
+        ex.mat.dispose();
+        this._explosions.splice(i, 1);
+      }
+    }
+  }
+
+  _spawnEncryptionBolt(from, target, player, damage = 12) {
     const geo = new THREE.SphereGeometry(0.1, 4, 4);
     const mat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.9 });
     const mesh = new THREE.Mesh(geo, mat);
@@ -299,7 +375,7 @@ export class EnemyManager {
     const dir = target.clone().sub(from).normalize();
     dir.y = 0;
 
-    const bolt = { mesh, dir, speed: 9, life: 3.0, player };
+    const bolt = { mesh, dir, speed: 9, life: 3.0, player, damage };
     this._encryptionBolts.push(bolt);
   }
 
@@ -312,11 +388,12 @@ export class EnemyManager {
 
       const dist = b.mesh.position.distanceTo(player.position);
       if (dist < 0.8) {
-        // Hit — lock player weapon temporarily
-        const weapon = player.weaponSystem?.current;
-        if (weapon?.lock) {
-          weapon.lock();
-          setTimeout(() => { if (weapon.unlock) weapon.unlock(); }, 2000);
+        // Hit — deal damage then lock the player's weapon temporarily
+        player.takeDamage(b.damage, 'encryption');
+        const ws = player.weaponSystem;
+        if (ws) {
+          ws.lock();
+          setTimeout(() => { ws.unlock(); }, 2000);
         }
         b.mesh.geometry.dispose();
         b.mesh.material.dispose();
@@ -335,33 +412,69 @@ export class EnemyManager {
   }
 
   _updatePatches(dt, player) {
-    // Corruption crawlers leave patches — DOT zones
+    // Transfer patches from living crawlers into the central array so patches
+    // outlive crawlers that die or get removed from the enemies list.
     this.enemies.forEach(e => {
       if (e.entity.type !== 'corruption_crawler') return;
-      e.entity._corruptionPatches?.forEach(patch => {
-        patch.life -= dt;
-        const dist = player.position.distanceTo(patch.position);
-        if (dist < 1.2) {
-          player.takeDamage(5 * dt, 'corruption');
-        }
-      });
-      if (e.entity._corruptionPatches) {
-        e.entity._corruptionPatches = e.entity._corruptionPatches.filter(p => p.life > 0);
+      if (e.entity._corruptionPatches?.length > 0) {
+        this._corruptionPatches.push(...e.entity._corruptionPatches);
+        e.entity._corruptionPatches = [];
       }
     });
+
+    // Tick all central patches — DOT zones
+    for (let i = this._corruptionPatches.length - 1; i >= 0; i--) {
+      const patch = this._corruptionPatches[i];
+      patch.life -= dt;
+      if (patch.life <= 0) {
+        this._corruptionPatches.splice(i, 1);
+        continue;
+      }
+      const dx = player.position.x - patch.position.x;
+      const dz = player.position.z - patch.position.z;
+      if (Math.sqrt(dx * dx + dz * dz) < 1.2) {
+        player.takeDamage(5 * dt, 'corruption');
+      }
+    }
   }
 
   _handleLevelEvent(evt) {
-    // Cascade titan events — basic implementations
+    const ov = document.getElementById('damage-overlay');
+
     if (evt === 'lights_flicker') {
       document.body.style.transition = 'filter 0.1s';
       document.body.style.filter = 'brightness(0.3)';
-      setTimeout(() => { document.body.style.filter = ''; }, 200);
+      setTimeout(() => { document.body.style.filter = ''; },            200);
       setTimeout(() => { document.body.style.filter = 'brightness(0.5)'; }, 300);
-      setTimeout(() => { document.body.style.filter = ''; }, 450);
+      setTimeout(() => { document.body.style.filter = ''; },            450);
+
     } else if (evt === 'alarm') {
-      document.getElementById('damage-overlay').style.boxShadow = 'inset 0 0 40px #ff220066';
-      setTimeout(() => { document.getElementById('damage-overlay').style.boxShadow = ''; }, 500);
+      if (ov) {
+        ov.style.boxShadow = 'inset 0 0 40px #ff220066';
+        setTimeout(() => { ov.style.boxShadow = ''; }, 500);
+      }
+
+    } else if (evt === 'phase2') {
+      this._showWaveToast('CASCADE PHASE 2 — THREAT ESCALATING');
+      if (ov) {
+        ov.style.boxShadow = 'inset 0 0 60px #ff880099';
+        setTimeout(() => { ov.style.boxShadow = ''; }, 700);
+      }
+      document.body.style.transition = 'filter 0.15s';
+      document.body.style.filter = 'brightness(1.8) sepia(0.4)';
+      setTimeout(() => { document.body.style.filter = ''; }, 400);
+
+    } else if (evt === 'phase3') {
+      this._showWaveToast('CASCADE PHASE 3 — CRITICAL FAILURE IMMINENT');
+      if (ov) {
+        ov.style.boxShadow = 'inset 0 0 90px #ff000099';
+        setTimeout(() => { ov.style.boxShadow = ''; },                        600);
+        setTimeout(() => { ov.style.boxShadow = 'inset 0 0 90px #ff000099'; }, 750);
+        setTimeout(() => { ov.style.boxShadow = ''; },                       1000);
+      }
+      document.body.style.transition = 'filter 0.1s';
+      document.body.style.filter = 'brightness(2.5) saturate(2)';
+      setTimeout(() => { document.body.style.filter = ''; }, 300);
     }
   }
 
@@ -390,7 +503,8 @@ export class EnemyManager {
         0.01,
         def.row * TILE + TILE / 2
       );
-      this._spawnEnemy(def.type, pos, { speedMult: finalSpeed, damageMult: finalDamage });
+      const patrol = _defPatrol(def);
+      this._spawnEnemy(def.type, pos, { speedMult: finalSpeed, damageMult: finalDamage }, patrol);
     });
 
     this._showWaveToast(`WAVE ${this._waveNum} INCOMING — ${count} THREATS DETECTED`);
@@ -421,5 +535,14 @@ export class EnemyManager {
 
   getAllEnemyEntities() {
     return this.enemies.map(e => e.entity);
+  }
+
+  // Returns the current wave number and, when the respawn countdown is running,
+  // the seconds remaining (null when enemies are still alive).
+  getWaveState() {
+    return {
+      num:      this._waveNum,
+      countdown: this._waveTimer >= 0 ? this._waveTimer : null,
+    };
   }
 }
