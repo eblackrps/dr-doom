@@ -75,12 +75,19 @@ export class Entity {
 
     // Seconds remaining on the white→red hit-flash applied to the sprite.
     this._hitFlash = 0;
+
+    // Grace period before the AI activates — prevents enemies from immediately
+    // attacking the player on spawn (game start or wave respawn).
+    this._spawnDelay   = 1.5;
   }
 
   // ---- Damage ----
 
   takeDamage(amount, type = DAMAGE_TYPES.PHYSICAL) {
     if (this.isDead) return;
+
+    // Being shot wakes the enemy up immediately
+    this._spawnDelay = 0;
 
     // Apply resistances (override per enemy subclass)
     const actual = this._applyResistance(amount, type);
@@ -123,6 +130,13 @@ export class Entity {
 
   update(dt, player, level) {
     if (this.isDead) return;
+
+    // Sit dormant for a moment after spawning so the player isn't
+    // immediately rushed or hit before they can orient themselves.
+    if (this._spawnDelay > 0) {
+      this._spawnDelay -= dt;
+      return;
+    }
 
     this._updateStatuses(dt);
     this._attackCooldown = Math.max(0, this._attackCooldown - dt);
@@ -183,9 +197,18 @@ export class Entity {
         break;
     }
 
-    // Face movement direction
-    if (this.velocity.lengthSq() > 0.01) {
-      this.yaw = Math.atan2(this.velocity.x, this.velocity.z);
+    // Smoothly rotate toward the player at a fixed turn speed so tracking
+    // looks natural rather than snapping instantly.
+    const faceX = player.position.x - this.position.x;
+    const faceZ = player.position.z - this.position.z;
+    if (faceX * faceX + faceZ * faceZ > 0.0001) {
+      const targetYaw = Math.atan2(faceX, faceZ);
+      let delta = targetYaw - this.yaw;
+      // Normalise to [-π, π] to always take the shortest arc
+      while (delta >  Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      const TURN_SPEED = 10; // radians/sec — completes 180° in ~0.3 s
+      this.yaw += Math.sign(delta) * Math.min(Math.abs(delta), TURN_SPEED * dt);
     }
   }
 

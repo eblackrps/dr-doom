@@ -23,6 +23,7 @@ export class Weapon {
     this._recoilDir     = 1;  // 1=kicking back, -1=returning
     this._swayT         = 0;
     this._locked        = false; // weapon-locked status effect (encryption bolt)
+    this._pendingFire   = false; // fire press buffered during switch animation
 
     // Switch animation
     this.switchState    = 'idle'; // 'lowering' | 'raising' | 'idle'
@@ -42,16 +43,24 @@ export class Weapon {
     this._updateSway(dt, input);
     this._applyViewmodelTransform(camera);
 
-    if (this.switchState !== 'idle') return;
-
-    // Fire on button-down event OR while holding — ensures single clicks always register
+    // Capture input before the switch-animation early return so clicks aren't eaten
     const justPressed = input.isMouseButtonJustPressed?.(0) ?? false;
     const held        = input.isMouseButtonDown(0);
-    const firing      = (justPressed || held) && !this._locked;
+
+    // Buffer click so it fires the instant the weapon finishes raising
+    if (justPressed) this._pendingFire = true;
+    if (!held)       this._pendingFire = false; // cancel if button released before ready
+
+    if (this.switchState !== 'idle') return;
+
+    const firing = (held || this._pendingFire) && !this._locked;
 
     if (firing) {
-      // On a fresh press, bypass the cooldown check to guarantee immediate response
-      if (justPressed) this._fireCooldown = Math.min(this._fireCooldown, 0);
+      // Bypass cooldown on fresh press (including buffered press after switch)
+      if (justPressed || this._pendingFire) {
+        this._fireCooldown = Math.min(this._fireCooldown, 0);
+        this._pendingFire  = false;
+      }
       this._tryFire(ammo, camera, projectileManager);
     }
   }
@@ -448,18 +457,20 @@ export class BackupBeam extends Weapon {
     const firing = input.isMouseButtonDown(0) && !this._locked;
 
     if (firing && !ammo.isEmpty(this.ammoType)) {
+      // Fire immediately on first press instead of waiting for the first tick
+      if (!this._beamActive) this._beamTick = this._beamTickRate;
+
+      this._beamActive = true;
       this._chargeT = Math.min(1, this._chargeT + dt * 2);
       this._beamTick += dt;
 
       if (this._beamTick >= this._beamTickRate) {
-        this._beamTick = 0;
+        this._beamTick -= this._beamTickRate;
         if (ammo.consume(this.ammoType, 1)) {
           this._stackDamage = Math.min(5, this._stackDamage + 0.3);
           this._fireBeam(camera, projectileManager.scene);
         }
       }
-
-      this._beamActive = true;
       // Update charge bar color
       if (this._chargeBar) {
         const h = this._chargeT;
@@ -467,6 +478,7 @@ export class BackupBeam extends Weapon {
         this._chargeBar.scale.x = this._chargeT;
       }
     } else {
+      this._beamActive = false;
       this._chargeT = Math.max(0, this._chargeT - dt * 3);
       this._stackDamage = 1;
       this._stopBeam(projectileManager.scene);

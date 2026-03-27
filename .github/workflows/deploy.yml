@@ -3,18 +3,16 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [master]
+    tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -28,11 +26,63 @@ jobs:
           npm ci
           npx vite build
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dr-doom/dist
+
+  deploy-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # Only deploy Pages on master branch pushes, not tag pushes
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dr-doom/dist
+          path: dist
 
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    # Only create a release when a version tag is pushed
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Zip build artifact
+        run: zip -r dr-doom-${{ github.ref_name }}.zip dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DR DOOM ${{ github.ref_name }}
+          body: |
+            ## DR DOOM ${{ github.ref_name }}
+
+            Disaster Recovery: The Game
+
+            ### Changes
+            See [commit history](../../commits/${{ github.ref_name }}) for details.
+
+            ### Play Online
+            [Launch DR DOOM](../../deployments/github-pages)
+          files: dr-doom-${{ github.ref_name }}.zip
+          make_latest: true
