@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WeaponSounds } from '../audio/weapons.js';
 
 // ---- Base Weapon ----
 
@@ -35,8 +36,8 @@ export class Weapon {
   _buildViewmodel() {}
 
   // Called every frame
-  update(dt, input, ammo, camera, projectileManager) {
-    if (this._fireCooldown > 0) this._fireCooldown -= dt;
+  update(dt, input, ammo, camera, projectileManager, modifiers = _defaultWeaponModifiers) {
+    if (this._fireCooldown > 0) this._fireCooldown -= dt * modifiers.cooldownScale;
 
     this._updateSwitch(dt);
     this._updateRecoil(dt);
@@ -400,7 +401,7 @@ export class ReplicationShotgun extends Weapon {
     this._pumpT = 0;
   }
 
-  update(dt, input, ammo, camera, projectileManager) {
+  update(dt, input, ammo, camera, projectileManager, modifiers = _defaultWeaponModifiers) {
     // Animate pump
     if (this._isPumping) {
       this._pumpT += dt * 5;
@@ -409,7 +410,7 @@ export class ReplicationShotgun extends Weapon {
       }
       if (this._pumpT >= Math.PI) this._isPumping = false;
     }
-    super.update(dt, input, ammo, camera, projectileManager);
+    super.update(dt, input, ammo, camera, projectileManager, modifiers);
   }
 }
 
@@ -476,8 +477,8 @@ export class BackupBeam extends Weapon {
     this.viewmodel = g;
   }
 
-  update(dt, input, ammo, camera, projectileManager) {
-    if (this._fireCooldown > 0) this._fireCooldown -= dt;
+  update(dt, input, ammo, camera, projectileManager, modifiers = _defaultWeaponModifiers) {
+    if (this._fireCooldown > 0) this._fireCooldown -= dt * modifiers.cooldownScale;
     this._updateSwitch(dt);
     this._updateRecoil(dt);
     this._updateSway(dt, input);
@@ -496,7 +497,7 @@ export class BackupBeam extends Weapon {
 
       this._beamActive = true;
       this._chargeT = Math.min(1, this._chargeT + dt * 2);
-      this._beamTick += dt;
+      this._beamTick += dt * modifiers.cooldownScale;
 
       if (this._beamTick >= this._beamTickRate) {
         this._beamTick -= this._beamTickRate;
@@ -640,11 +641,18 @@ export class FailoverLauncher extends Weapon {
       color: 0xff8800,
       scale: 0.2,
       type: 'failover',
+      splash: {
+        radius: 3.2,
+        damage: 90,
+        minDamage: 18,
+        stunDuration: 1.2,
+      },
       onHit: (pos) => this._explode(pos, projectileManager.scene, projectileManager),
     });
   }
 
   _explode(pos, scene, projectileManager) {
+    WeaponSounds.failoverExplosion();
     const blast = new THREE.Mesh(
       new THREE.SphereGeometry(2.5, 8, 8),
       new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.4, wireframe: true })
@@ -850,7 +858,7 @@ export class CDPChaingun extends Weapon {
     this.viewmodel = g;
   }
 
-  update(dt, input, ammo, camera, projectileManager) {
+  update(dt, input, ammo, camera, projectileManager, modifiers = _defaultWeaponModifiers) {
     // Spin barrels based on fire state
     const firing = input.isMouseButtonDown(0) && !this._locked && this.switchState === 'idle';
     if (firing && !ammo.isEmpty(this.ammoType)) {
@@ -862,7 +870,7 @@ export class CDPChaingun extends Weapon {
     this._spinT += this._spinSpeed * dt;
     if (this._barrel) this._barrel.rotation.z = this._spinT;
 
-    super.update(dt, input, ammo, camera, projectileManager);
+    super.update(dt, input, ammo, camera, projectileManager, modifiers);
   }
 
   _onFire(camera, projectileManager) {
@@ -969,11 +977,18 @@ export class BFR9000 extends Weapon {
       color: 0x00ff41,
       scale: 0.45,
       type: 'bfr',
+      splash: {
+        radius: 6.5,
+        damage: 260,
+        minDamage: 80,
+        stunDuration: 2.0,
+      },
       onHit: (pos) => this._detonate(pos, projectileManager.scene, projectileManager),
     });
   }
 
   _detonate(pos, scene, projectileManager) {
+    WeaponSounds.bfr9000Detonate();
     const wave = new THREE.Mesh(
       new THREE.SphereGeometry(0.1, 12, 12),
       new THREE.MeshBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0.7 })
@@ -994,3 +1009,7 @@ export class BFR9000 extends Weapon {
     });
   }
 }
+
+const _defaultWeaponModifiers = {
+  cooldownScale: 1,
+};

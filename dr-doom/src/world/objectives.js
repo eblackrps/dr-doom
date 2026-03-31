@@ -67,10 +67,17 @@ export const LEVEL1_OBJECTIVES = [
   },
   {
     id: 'obj-clear-threats',
-    label: 'NEUTRALIZE ALL THREATS',
-    detail: 'Eliminate all hostile entities on this floor',
+    label: 'COMPLETE FINAL CONTAINMENT SWEEP',
+    detail: 'After restoring the floor, clear every remaining hostile between the vault and the exit corridor',
     type: OBJ_TYPE.KILL_ALL_IN_ROOM,
-    prereqs: [],
+    prereqs: [
+      'obj-restore-vms',
+      'obj-verify-backups',
+      'obj-check-hardened',
+      'obj-restore-network',
+      'obj-check-env',
+      'obj-architect-kb',
+    ],
   },
   {
     id: 'obj-exit',

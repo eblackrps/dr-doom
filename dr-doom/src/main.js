@@ -25,6 +25,8 @@ import { MusicSystem }       from './audio/music.js';
 import { WeaponSounds }      from './audio/weapons.js';
 import { EnemySounds }       from './audio/enemies.js';
 import { saves }             from './save/save-system.js';
+import { loadGameplaySettings } from './settings/gameplay-settings.js';
+import { EncounterDirector } from './world/encounters.js';
 
 // Touch device gate — must run before anything else.
 // Pointer lock + keyboard + mouse are required; touch-only devices cannot play.
@@ -38,10 +40,15 @@ if (isTouchDevice) {
 } else {
   // Normal desktop path
   const title = new TitleScreen();
-  title.show().then(() => boot().then(() => launchGame()));
+  title.show().then((selection) => {
+    if (selection === 'new-run') {
+      saves.clearCheckpoint();
+    }
+    boot().then(() => launchGame(selection));
+  });
 }
 
-function launchGame() {
+function launchGame(startMode = 'resume') {
   const canvas          = document.getElementById('game-canvas');
   const canvasContainer = document.getElementById('canvas-container');
   const hudEl           = document.getElementById('hud');
@@ -52,14 +59,15 @@ function launchGame() {
   lockPrompt.style.display = 'flex';
 
   const diff = saves.getDifficultyConfig();
+  const gameplaySettings = loadGameplaySettings();
 
-  const renderer    = new Renderer(canvas);
+  const renderer    = new Renderer(canvas, gameplaySettings);
   const input       = new InputHandler(canvas, lockPrompt);
   const consoleUI   = new ConsoleUI();
   // consoleUI passed explicitly — no window global needed
   const interaction = new InteractionSystem(renderer.camera, renderer.scene, consoleUI);
   const level       = new Level(renderer.scene, interaction);
-  const player      = new Player(renderer.camera, input);
+  const player      = new Player(renderer.camera, input, gameplaySettings);
   const weapons     = new WeaponSystem(renderer.weaponScene, renderer.scene);
   const enemies     = new EnemyManager(renderer.scene, weapons);
   const hazards     = new HazardSystem(renderer.scene);
@@ -69,10 +77,11 @@ function launchGame() {
   const bossHUD     = new BossHUD();
   const victory     = new VictoryScreen();
   const hud         = new HUD();
-  const pauseMenu   = new PauseMenu(input, null);
+  const pauseMenu   = new PauseMenu(input, null, { renderer, player });
   const minimap     = new Minimap(level._map ?? null);
   const ambient     = new AmbientAudio();
   const music       = new MusicSystem();
+  const encounters  = new EncounterDirector(enemies, weapons);
 
   // Boss arenas
   const sharedSolid = [];
@@ -96,6 +105,27 @@ function launchGame() {
     return false;
   };
 
+  const origHasLOS = level.hasLOS.bind(level);
+  level.hasLOS = (from, to) => {
+    if (!origHasLOS(from, to)) return false;
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.001) return true;
+    const nx = dx / dist;
+    const nz = dz / dist;
+    for (let d = 1.0; d < dist - 0.5; d += 1.0) {
+      const tx = from.x + nx * d;
+      const tz = from.z + nz * d;
+      for (const cell of sharedSolid) {
+        if (tx > cell.minX && tx < cell.maxX &&
+            1.0 > cell.minY && 1.0 < cell.maxY &&
+            tz > cell.minZ && tz < cell.maxZ) return false;
+      }
+    }
+    return true;
+  };
+
   // Apply difficulty after spawnAll, exactly once
   let difficultyApplied = false;
   const origSpawn = enemies.spawnAll.bind(enemies);
@@ -117,6 +147,17 @@ function launchGame() {
     auditArena.boss._taskTimer = auditArena.boss.tasks[0]?.timeLimit ?? auditArena.boss._taskTimer;
   }
 
+  const applyBossDifficulty = (boss) => {
+    if (!boss) return;
+    boss.maxHealth = Math.round(boss.maxHealth * (diff.bossHealthMult ?? 1));
+    boss.health = boss.maxHealth;
+    boss.damage *= diff.bossDamageMult ?? 1;
+    boss.speed *= diff.bossSpeedMult ?? diff.enemySpeedMult;
+  };
+
+  applyBossDifficulty(rkArena.boss);
+  applyBossDifficulty(ctArena.boss);
+
   enemies._diffConfig = diff;
   auditArena.setWaveSpawner((spawns, options) => enemies.spawnScriptedWave(spawns, options));
 
@@ -136,6 +177,7 @@ function launchGame() {
   if (checkpoint) {
     player.health = checkpoint.playerHp;
     player.armor  = checkpoint.playerArmor;
+    weapons.restoreUnlockedSlots(checkpoint.unlockedSlots ?? [1]);
     if (checkpoint.ammo) {
       Object.entries(checkpoint.ammo).forEach(([k, v]) => {
         weapons.ammo.counts[k] = v;
@@ -160,7 +202,7 @@ function launchGame() {
         music.setState('boss');
       }
       audio.applySettings();
-      pauseMenu._audio = audio;
+      pauseMenu.setAudioSystem(audio);
     }
   });
 
@@ -169,6 +211,7 @@ function launchGame() {
 
   consoleUI.setOnOpen(id => {
     objectives.notifyConsoleAccessed(id);
+    encounters.handleConsoleAccessed(id);
     EnemySounds.consoleAccess();
   });
 
@@ -205,17 +248,32 @@ function launchGame() {
 
   // Player damage — playerDamageReceiveMult >1 means squishier (Nightmare), <1 means tankier (Intern)
   const origTakeDamage = player.takeDamage.bind(player);
+  let lastPlayerDamageSoundAt = -Infinity;
   player.takeDamage = (amount, type) => {
     origTakeDamage(amount * diff.playerDamageReceiveMult, type);
     if (audio.ready) {
-      player.health < 20 ? EnemySounds.playerCritical() : EnemySounds.playerHurt();
+      const now = performance.now() * 0.001;
+      const interval = player.health < 20 ? 0.45 : 0.16;
+      if (now - lastPlayerDamageSoundAt >= interval) {
+        player.health < 20 ? EnemySounds.playerCritical() : EnemySounds.playerHurt();
+        lastPlayerDamageSoundAt = now;
+      }
+    }
+  };
+
+  const origApplyStatus = player.applyStatus.bind(player);
+  player.applyStatus = (name, duration) => {
+    origApplyStatus(name, duration);
+    if (name === 'slowed' && audio.ready) {
+      EnemySounds.statusSlow();
     }
   };
 
   // BFR secret pickup via custom event
   window.addEventListener('bfr-secret-found', () => {
-    weapons.ammo.add('BFR_CELLS', 2);
+    weapons.unlockSlot(7, { ammoType: 'BFR_CELLS', amount: 2 });
     EnemySounds.pickupAmmo();
+    _showSystemToast('ARSENAL OVERRIDE // BFR-9000 AUTHORIZED', '#00ff41');
   });
 
   const saveCheckpoint = (arenaId) =>
@@ -244,7 +302,7 @@ function launchGame() {
     music.setState('boss');
   });
 
-  auditArena.onComplete(() => {
+  auditArena.onSuccess(() => {
     bossHUD.hide(); hud.faceCam?.notifyBossExit();
     music.stop(); saves.clearCheckpoint();
     setTimeout(() => {
@@ -260,8 +318,24 @@ function launchGame() {
           found: secrets.getFoundCount(),
           total: secrets.getTotalCount(),
         },
+        difficulty: diff.label,
       });
     }, 1500);
+  });
+
+  auditArena.onFailure(() => {
+    bossHUD.hide(); hud.faceCam?.notifyBossExit();
+    gameOver = true;
+    document.exitPointerLock?.();
+    if (audioStarted) {
+      music.stop();
+      ambient.stop();
+    }
+    _showGameOverOverlay(
+      'AUDIT FAILED',
+      'RTO BREACHED — CHECKPOINT RETAINED',
+      saves.hasCheckpoint() ? 'CLICK TO RESUME CHECKPOINT' : 'CLICK TO REBOOT'
+    );
   });
 
   objectives.onLevelComplete(() => {
@@ -299,7 +373,7 @@ function launchGame() {
   if (checkpoint?.arenaId) {
     restoreBossCheckpoint(checkpoint.arenaId);
   } else {
-    enemies.spawnAll();
+    encounters.startMission();
   }
 
   const hudTitle  = document.getElementById('hud-title');
@@ -383,21 +457,31 @@ function launchGame() {
         }
 
         objectives.update(player.position, enemies.getAllEnemyEntities());
+        encounters.update(player.position, objectives.getObjectives());
         if (objectives.levelComplete && !levelDone) levelDone = true;
 
         updateMusicState(dt);
         if (audio.ready && Math.random() < dt * 0.15) ambient.triggerElectricArc();
 
-        if      (auditArena._active) { auditArena.update(dt, player, renderer.camera); bossHUD.update(auditArena.boss); }
-        else if (ctArena._active)    { ctArena.update(dt, player, renderer.camera);    bossHUD.update(ctArena.boss);   }
-        else if (rkArena._active)    { rkArena.update(dt, player, renderer.camera);    bossHUD.update(rkArena.boss);   }
+        if      (auditArena._active) { auditArena.update(dt, player, renderer.camera, level); bossHUD.update(auditArena.boss); }
+        else if (ctArena._active)    { ctArena.update(dt, player, renderer.camera, level);    bossHUD.update(ctArena.boss);   }
+        else if (rkArena._active)    { rkArena.update(dt, player, renderer.camera, level);    bossHUD.update(rkArena.boss);   }
 
         if (audio.ready) audio.updateListener(player.position.x, player.position.y, player.position.z, player.yaw);
       }
     }
 
     level.update(dt);
-    hud.update(player, weapons, elapsed, inBossFight(), enemies.getWaveState(), dt);
+    const activeBoss =
+      auditArena._active ? auditArena.boss :
+      ctArena._active ? ctArena.boss :
+      rkArena._active ? rkArena.boss :
+      null;
+    hud.update(player, weapons, elapsed, inBossFight(), enemies.getWaveState(), dt, {
+      ...player.getStatusState(),
+      ...weapons.getStatusState(),
+      bossVulnerable: activeBoss?.isVulnerable?.() ?? false,
+    });
     objHUD.update(objectives.getObjectives());
     minimap.update(player.getPosition(), player.yaw, enemies.getAllEnemyEntities());
 
@@ -421,7 +505,7 @@ function launchGame() {
   window.addEventListener('resize', () => renderer.onResize());
 }
 
-function _showGameOverOverlay() {
+function _showGameOverOverlay(titleText = 'SYSTEM DOWN', subText = 'RTO BREACHED — ALL SYSTEMS LOST', promptText = 'CLICK TO REBOOT') {
   const el = document.createElement('div');
   el.id = 'game-over-overlay';
   el.style.cssText = `
@@ -439,21 +523,21 @@ function _showGameOverOverlay() {
     text-shadow:0 0 20px #ff2200, 0 0 40px #ff220055;
     margin-bottom:16px;
   `;
-  title.textContent = 'SYSTEM DOWN';
+  title.textContent = titleText;
 
   const sub = document.createElement('div');
   sub.style.cssText = `
     font-size:12px; letter-spacing:3px;
     color:#aa4400; margin-bottom:40px;
   `;
-  sub.textContent = 'RTO BREACHED — ALL SYSTEMS LOST';
+  sub.textContent = subText;
 
   const prompt = document.createElement('div');
   prompt.style.cssText = `
     font-size:10px; letter-spacing:2px;
     color:#445544; opacity:0; transition:opacity 0.5s;
   `;
-  prompt.textContent = 'CLICK TO REBOOT';
+  prompt.textContent = promptText;
 
   el.appendChild(title);
   el.appendChild(sub);
@@ -462,6 +546,21 @@ function _showGameOverOverlay() {
 
   setTimeout(() => { prompt.style.opacity = '1'; }, 2000);
   el.addEventListener('click', () => location.reload());
+}
+
+function _showSystemToast(text, color = '#ffaa00') {
+  const el = document.createElement('div');
+  el.style.cssText = `
+    position:fixed; top:32%; left:50%; transform:translateX(-50%);
+    padding:10px 14px; border:1px solid ${color}33;
+    background:rgba(0,0,0,0.82); font-family:'Courier New',monospace;
+    font-size:11px; letter-spacing:2px; color:${color};
+    text-shadow:0 0 10px ${color}; pointer-events:none;
+    white-space:nowrap; z-index:520; animation:objToast 3s forwards;
+  `;
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
 }
 
 function _showCheckpointToast(arenaId) {

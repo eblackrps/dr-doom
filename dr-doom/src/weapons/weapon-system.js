@@ -37,6 +37,9 @@ export class WeaponSystem {
     this._pendingSlot = -1;
     this._switchCooldown = 0;
     this._locked = false;  // true while an encryption bolt effect is active
+    this._fireRateSlowTimer = 0;
+    this._fireRateSlowScale = 1;
+    this._unlockedSlots = new Set([1]);
 
     // Start with weapon 1 drawn
     this.weapons[0].switchTo();
@@ -45,6 +48,12 @@ export class WeaponSystem {
   // Called by encryption bolt hit — prevents firing for a short window.
   lock()   { this._locked = true;  }
   unlock() { this._locked = false; }
+  isLocked() { return this._locked; }
+
+  applyFireRateSlow(duration, scale = 0.55) {
+    this._fireRateSlowTimer = Math.max(this._fireRateSlowTimer, duration);
+    this._fireRateSlowScale = Math.min(this._fireRateSlowScale, scale);
+  }
 
   get current() {
     return this.weapons[this.currentSlot];
@@ -59,11 +68,20 @@ export class WeaponSystem {
     this._handleSwitchInput(input);
     this._handleScrollWheel(input);
 
+    if (this._fireRateSlowTimer > 0) {
+      this._fireRateSlowTimer = Math.max(0, this._fireRateSlowTimer - dt);
+      if (this._fireRateSlowTimer <= 0) this._fireRateSlowScale = 1;
+    }
+
+    const modifiers = {
+      cooldownScale: this._fireRateSlowTimer > 0 ? this._fireRateSlowScale : 1,
+    };
+
     // Update all weapons (only current fires, but all animate switch state).
     // While locked by an encryption bolt, feed _noInput to the active slot too.
     this.weapons.forEach((w, i) => {
       const activeInput = (i === this.currentSlot && !this._locked) ? input : _noInput;
-      w.update(dt, activeInput, this.ammo, camera, this.projectiles);
+      w.update(dt, activeInput, this.ammo, camera, this.projectiles, modifiers);
     });
 
     // Update projectiles
@@ -99,19 +117,72 @@ export class WeaponSystem {
   _handleScrollWheel(input) {
     if (input.scrollDelta === undefined) return;
     if (input.scrollDelta > 0) {
-      this._requestSwitch((this.currentSlot + 1) % this.weapons.length);
+      this._requestSwitch(this._findNextUnlocked(1));
     } else if (input.scrollDelta < 0) {
-      this._requestSwitch((this.currentSlot - 1 + this.weapons.length) % this.weapons.length);
+      this._requestSwitch(this._findNextUnlocked(-1));
     }
     input.scrollDelta = 0;
   }
 
   _requestSwitch(slot) {
+    if (!this.isSlotUnlocked(slot + 1)) return;
     if (slot === this.currentSlot) return;
     if (this._pendingSlot >= 0) return; // already switching
 
     this._pendingSlot = slot;
     this.weapons[this.currentSlot].switchAway();
+  }
+
+  _findNextUnlocked(direction) {
+    for (let offset = 1; offset <= this.weapons.length; offset++) {
+      const next = (this.currentSlot + offset * direction + this.weapons.length) % this.weapons.length;
+      if (this.isSlotUnlocked(next + 1)) return next;
+    }
+    return this.currentSlot;
+  }
+
+  unlockSlot(slot, ammoGrant = null) {
+    if (slot < 1 || slot > this.weapons.length) return false;
+    const wasUnlocked = this._unlockedSlots.has(slot);
+    this._unlockedSlots.add(slot);
+    if (ammoGrant?.ammoType) {
+      this.ammo.add(ammoGrant.ammoType, ammoGrant.amount ?? 0);
+    }
+    return !wasUnlocked;
+  }
+
+  restoreUnlockedSlots(slots = []) {
+    const restored = new Set(
+      slots
+        .filter(slot => Number.isInteger(slot) && slot >= 1 && slot <= this.weapons.length),
+    );
+    if (restored.size === 0) restored.add(1);
+    this._unlockedSlots = restored;
+    if (!this.isSlotUnlocked(this.currentSlot + 1)) {
+      const firstUnlocked = Math.min(...this._unlockedSlots) - 1;
+      this.currentSlot = Math.max(0, firstUnlocked);
+      this.weapons.forEach((weapon, index) => {
+        weapon.visible = index === this.currentSlot;
+        weapon.switchState = index === this.currentSlot ? 'idle' : 'down';
+      });
+      this.weapons[this.currentSlot].switchTo();
+    }
+  }
+
+  isSlotUnlocked(slot) {
+    return this._unlockedSlots.has(slot);
+  }
+
+  getUnlockedSlots() {
+    return [...this._unlockedSlots].sort((a, b) => a - b);
+  }
+
+  getStatusState() {
+    return {
+      locked: this._locked,
+      fireRateSlowed: this._fireRateSlowTimer > 0,
+      fireRateSlowRemaining: this._fireRateSlowTimer,
+    };
   }
 
   // For HUD

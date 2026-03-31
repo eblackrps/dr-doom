@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RansomwareKing, CascadeFailureTitanFull, TheAudit, AUDIT_TASKS } from '../entities/bosses.js';
 import { buildSpriteSheet, BillboardSprite } from '../entities/sprites.js';
 import { PickupManager } from '../entities/pickups.js';
+import { EnemySounds } from '../audio/enemies.js';
 
 const TILE   = 4;
 const WALL_H = 4;
@@ -234,13 +235,13 @@ export class RansomwareKingArena {
 
   onDefeat(fn) { this._onDefeat = fn; }
 
-  update(dt, player, camera) {
+  update(dt, player, camera, level) {
     if (!this._active || this._bossDefeated) {
       this.pickups.update(dt, player);
       return;
     }
 
-    this.boss.update(dt, player, { collidesAABB: () => false, getStepHeight: () => 0 });
+    this.boss.update(dt, player, level);
 
     // Update group position
     this.group.position.copy(this.boss.position);
@@ -295,7 +296,11 @@ export class RansomwareKingArena {
       if (b.mesh.position.distanceTo(b.player.position) < 0.8) {
         player.takeDamage(12, 'encryption');
         const ws = player.weaponSystem;
-        if (ws) { ws.lock(); this._bossWeaponLockTimer = 2.5; }
+        if (ws) {
+          ws.lock();
+          this._bossWeaponLockTimer = 2.5;
+          EnemySounds.weaponLock();
+        }
         b.life = 0;
       }
       if (b.life <= 0) {
@@ -348,6 +353,7 @@ export class RansomwareKingArena {
   _handleBossEvent(evt, player) {
     if (evt.type === 'phase_change') {
       this._showArenaMessage(`PHASE ${evt.phase} — ENCRYPTION ACCELERATING`, 0xff0066);
+      EnemySounds.bossVulnerable();
     } else if (evt.type === 'node_hit') {
       const node = this._nodes[evt.index];
       if (node) {
@@ -356,6 +362,7 @@ export class RansomwareKingArena {
       }
     } else if (evt.type === 'nodes_cleared') {
       this._showArenaMessage('DECRYPTION NODES CLEARED — BOSS VULNERABLE', 0x00ffaa);
+      EnemySounds.bossVulnerable();
       // Decrypt all panels briefly
       this._panels.forEach(p => {
         if (p.encrypted) {
@@ -510,14 +517,14 @@ export class CascadeTitanArena {
   activate() { this._active = true; }
   onDefeat(fn) { this._onDefeat = fn; }
 
-  update(dt, player, camera) {
+  update(dt, player, camera, level) {
     if (!this._active || this._bossDefeated) {
       this.pickups.update(dt, player);
       return;
     }
 
     this._elapsed += dt;
-    this.boss.update(dt, player, { collidesAABB: () => false, getStepHeight: () => 0 });
+    this.boss.update(dt, player, level);
     this.group.position.copy(this.boss.position);
 
     // Shake on charge
@@ -582,6 +589,7 @@ export class CascadeTitanArena {
       this._triggerArenaEvent(evt.event);
     } else if (evt.type === 'phase_change') {
       this._showMsg(`PHASE ${evt.phase} — CASCADE ACCELERATING`, 0xff8800);
+      EnemySounds.bossVulnerable();
     }
   }
 
@@ -676,7 +684,8 @@ export class AuditArena {
     this.pickups       = new PickupManager(scene);
     this._active       = false;
     this._complete     = false;
-    this._onComplete   = null;
+    this._onSuccess    = null;
+    this._onFailure    = null;
     this._taskConsoles = []; // { mesh, taskIndex, accessed }
     this._hudEl        = null;
     this._elapsed      = 0;
@@ -733,7 +742,7 @@ export class AuditArena {
     // Large screen face
     const screen = new THREE.Mesh(
       new THREE.BoxGeometry(4.0, 2.5, 0.15),
-      new THREE.MeshBasicMaterial({ color: 0x001133 })
+      new THREE.MeshBasicMaterial({ color: 0x001133, transparent: true, opacity: 0.9 })
     );
     screen.position.set(cx, 2.0, cz);
     this.scene.add(screen);
@@ -902,17 +911,18 @@ export class AuditArena {
     if (this._hudEl) this._hudEl.style.display = 'block';
   }
 
-  onComplete(fn) { this._onComplete = fn; }
+  onSuccess(fn) { this._onSuccess = fn; }
+  onFailure(fn) { this._onFailure = fn; }
   setWaveSpawner(fn) { this._spawnWaveFn = fn; }
 
-  update(dt, player, camera) {
+  update(dt, player, camera, level) {
     if (!this._active || this._complete) {
       this.pickups.update(dt, player);
       return;
     }
 
     this._elapsed += dt;
-    this.boss.update(dt, player, null);
+    this.boss.update(dt, player, level);
 
     // Pulse terminal
     if (this._terminalMesh) {
@@ -1026,14 +1036,13 @@ export class AuditArena {
         this.pickups.spawn(drop.type, pos, { amount: drop.amount });
       }
     });
-    this._onComplete?.();
+    this._onSuccess?.();
   }
 
   _onRTOBreach(player) {
     if (this._hudEl) this._hudEl.style.display = 'none';
-    player.takeDamage(50, 'physical');
     this._showMsg('RTO BREACHED — CAREER TERMINATED', 0xff2200);
-    setTimeout(() => this._onComplete?.(), 3000);
+    this._onFailure?.();
   }
 
   _showMsg(text, color) {

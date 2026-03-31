@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { loadGameplaySettings } from '../settings/gameplay-settings.js';
 
 const PLAYER_HEIGHT   = 1.65;
 const PLAYER_RADIUS   = 0.3;
 const MOVE_SPEED      = 12.0;   // DOOM-fast. Always sprinting.
-const MOUSE_SENS      = 0.0018;
+const BASE_MOUSE_SENS = 0.0018;
 const BOB_FREQ        = 8.0;
 const BOB_AMP_Y       = 0.06;
 const BOB_AMP_X       = 0.03;
@@ -11,7 +12,7 @@ const GRAVITY         = -20;
 const JUMP_VELOCITY   = 7;
 
 export class Player {
-  constructor(camera, input) {
+  constructor(camera, input, settings = loadGameplaySettings()) {
     this.camera = camera;
     this.input = input;
 
@@ -33,11 +34,18 @@ export class Player {
 
     // Status timers
     this._slowTimer = 0;
+    this._invertY = !!settings.invertY;
+    this._mouseSensitivity = BASE_MOUSE_SENS * (settings.mouseSensitivity ?? 1.0);
 
     // Stats (referenced by HUD)
     this.health = 100;
     this.armor  = 100;
     this.ammo   = Infinity;
+  }
+
+  applyLookSettings(settings = loadGameplaySettings()) {
+    this._invertY = !!settings.invertY;
+    this._mouseSensitivity = BASE_MOUSE_SENS * (settings.mouseSensitivity ?? 1.0);
   }
 
   setPosition(pos) {
@@ -56,8 +64,9 @@ export class Player {
     const { dx, dy } = this.input.mouse;
     if (!this.input.isLocked) return;
 
-    this.yaw   -= dx * MOUSE_SENS;
-    this.pitch -= dy * MOUSE_SENS;
+    this.yaw -= dx * this._mouseSensitivity;
+    const lookDelta = (this._invertY ? -dy : dy) * this._mouseSensitivity;
+    this.pitch -= lookDelta;
 
     // Clamp pitch to prevent full vertical look (DOOM feel)
     this.pitch = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, this.pitch));
@@ -243,8 +252,16 @@ export class Player {
 
   applyStatus(name, duration) {
     if (name === 'slowed') {
-      this._slowTimer = duration;
+      this._slowTimer = Math.max(this._slowTimer, duration);
+      this.weaponSystem?.applyFireRateSlow(duration, 0.55);
     }
+  }
+
+  getStatusState() {
+    return {
+      slowed: this._slowTimer > 0,
+      slowRemaining: this._slowTimer,
+    };
   }
 
   getPosition() {

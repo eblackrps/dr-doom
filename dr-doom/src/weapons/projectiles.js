@@ -21,7 +21,7 @@ export class ProjectileManager {
     this._vfx = []; // generic visual effects updated by game loop
   }
 
-  spawn({ position, direction, speed, damage, color, scale, type, onHit }) {
+  spawn({ position, direction, speed, damage, color, scale, type, splash, onHit }) {
     const geo = new THREE.SphereGeometry(scale ?? 0.12, 4, 4);
     const mat = new THREE.MeshBasicMaterial({ color: color ?? 0x00ff41 });
     const mesh = new THREE.Mesh(geo, mat);
@@ -37,6 +37,7 @@ export class ProjectileManager {
       velocity: direction.clone().normalize().multiplyScalar(speed ?? 20),
       damage: damage ?? 50,
       type: type ?? 'standard',
+      splash: splash ?? null,
       onHit: onHit ?? null,
       life: 3.0, // seconds before auto-despawn
     });
@@ -116,10 +117,36 @@ export class ProjectileManager {
       }
 
       if (hit || p.life <= 0) {
+        if (hit && p.splash) this._applySplashDamage(p.mesh.position.clone(), p.splash, enemies, p.type);
         if (hit && p.onHit) p.onHit(p.mesh.position.clone());
         this._despawn(i);
       }
     }
+  }
+
+  _applySplashDamage(origin, splash, enemies, type) {
+    if (!Array.isArray(enemies) || !splash) return;
+
+    enemies.forEach(target => {
+      if (!target || target.isDead) return;
+
+      const dx = target.position.x - origin.x;
+      const dz = target.position.z - origin.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > splash.radius) return;
+
+      const pct = 1 - dist / Math.max(splash.radius, 0.01);
+      const minDamage = splash.minDamage ?? splash.damage;
+      const scaledDamage = minDamage + (splash.damage - minDamage) * Math.max(0, pct);
+      target.takeDamage(scaledDamage, type);
+
+      if (splash.stunDuration) {
+        const duration = target.isBoss
+          ? Math.min(0.5, splash.stunDuration * 0.4)
+          : splash.stunDuration;
+        target.applyStatus?.('stunned', duration);
+      }
+    });
   }
 
   _despawn(index) {

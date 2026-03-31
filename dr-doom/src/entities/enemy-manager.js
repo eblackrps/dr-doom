@@ -11,6 +11,7 @@ import {
   CascadeFailureTitan,
 } from './enemies.js';
 import { AI_STATE } from './entity.js';
+import { EnemySounds } from '../audio/enemies.js';
 
 const TILE = 4;
 
@@ -19,59 +20,59 @@ const TILE = 4;
 // in PATROL state and walk the loop at half-speed; they switch to CHASE on sight.
 const SPAWN_DEFS = [
   // Main Server Floor — crawlers and wraiths
-  { type: 'corruption_crawler', col: 4,  row: 4,
+  { type: 'corruption_crawler', col: 4,  row: 4, encounter: 'server-floor',
     patrol: [[2,1],[6,5],[2,9],[6,9]] },
-  { type: 'corruption_crawler', col: 8,  row: 7,
+  { type: 'corruption_crawler', col: 8,  row: 7, encounter: 'server-floor',
     patrol: [[6,5],[11,1],[11,9],[6,9]] },
-  { type: 'corruption_crawler', col: 10, row: 3,
+  { type: 'corruption_crawler', col: 10, row: 3, encounter: 'server-floor',
     patrol: [[11,1],[8,2],[8,5],[11,5]] },
-  { type: 'ransomware_wraith',  col: 7,  row: 5,
+  { type: 'ransomware_wraith',  col: 7,  row: 5, encounter: 'server-floor',
     patrol: [[6,2],[11,2],[11,8],[6,8],[2,5]] },
-  { type: 'ransomware_wraith',  col: 3,  row: 9,
+  { type: 'ransomware_wraith',  col: 3,  row: 9, encounter: 'server-floor',
     patrol: [[2,9],[2,5],[2,1],[6,1],[6,9]] },
 
   // Storage Vault — gremlins and leeches
-  { type: 'hardware_gremlin',   col: 17, row: 4,
+  { type: 'hardware_gremlin',   col: 17, row: 4, encounter: 'storage-vault',
     patrol: [[15,2],[19,2],[19,8],[15,8]] },
-  { type: 'hardware_gremlin',   col: 22, row: 7,
+  { type: 'hardware_gremlin',   col: 22, row: 7, encounter: 'storage-vault',
     patrol: [[22,2],[26,5],[22,9],[18,5]] },
-  { type: 'latency_leech',      col: 19, row: 9,
+  { type: 'latency_leech',      col: 19, row: 9, encounter: 'storage-vault',
     patrol: [[15,9],[15,5],[19,5],[23,9]] },
-  { type: 'latency_leech',      col: 25, row: 3,
+  { type: 'latency_leech',      col: 25, row: 3, encounter: 'storage-vault',
     patrol: [[26,1],[26,9],[22,5],[19,1]] },
 
   // Network Core — phantoms and specters
-  { type: 'network_phantom',    col: 3,  row: 15,
+  { type: 'network_phantom',    col: 3,  row: 15, encounter: 'network-core',
     patrol: [[2,13],[2,19],[7,19],[7,13]] },
-  { type: 'network_phantom',    col: 7,  row: 18,
+  { type: 'network_phantom',    col: 7,  row: 18, encounter: 'network-core',
     patrol: [[9,13],[9,20],[1,20],[1,14]] },
-  { type: 'config_drift_specter', col: 5, row: 17,
+  { type: 'config_drift_specter', col: 5, row: 17, encounter: 'network-core',
     patrol: [[2,14],[5,14],[9,18],[5,20],[2,19]] },
-  { type: 'config_drift_specter', col: 9, row: 14,
+  { type: 'config_drift_specter', col: 9, row: 14, encounter: 'network-core',
     patrol: [[10,13],[10,20],[4,20],[4,14],[1,17]] },
 
   // Cold Aisle — mixed
-  { type: 'corruption_crawler', col: 14, row: 15,
+  { type: 'corruption_crawler', col: 14, row: 15, encounter: 'cold-aisle',
     patrol: [[14,13],[18,13],[18,19],[14,19]] },
-  { type: 'ransomware_wraith',  col: 16, row: 18,
+  { type: 'ransomware_wraith',  col: 16, row: 18, encounter: 'cold-aisle',
     patrol: [[14,14],[18,14],[18,19],[14,19]] },
-  { type: 'latency_leech',      col: 15, row: 16,
+  { type: 'latency_leech',      col: 15, row: 16, encounter: 'cold-aisle',
     patrol: [[13,15],[18,15],[18,18],[13,18]] },
 
   // Management Console Room — specters and wraiths
-  { type: 'config_drift_specter', col: 22, row: 15,
+  { type: 'config_drift_specter', col: 22, row: 15, encounter: 'management',
     patrol: [[22,13],[26,13],[26,19],[22,19]] },
-  { type: 'config_drift_specter', col: 25, row: 18,
+  { type: 'config_drift_specter', col: 25, row: 18, encounter: 'management',
     patrol: [[21,14],[26,14],[26,20],[21,20]] },
-  { type: 'ransomware_wraith',  col: 23, row: 17,
+  { type: 'ransomware_wraith',  col: 23, row: 17, encounter: 'management',
     patrol: [[22,13],[26,13],[26,19],[22,19],[21,16]] },
 
   // Emergency Exit Corridor — titan guarding the exit
-  { type: 'cascade_titan',      col: 13, row: 27,
+  { type: 'cascade_titan',      col: 13, row: 27, encounter: 'exit-corridor',
     patrol: [[10,25],[16,25],[16,29],[10,29]] },
-  { type: 'hardware_gremlin',   col: 11, row: 25,
+  { type: 'hardware_gremlin',   col: 11, row: 25, encounter: 'exit-corridor',
     patrol: [[9,24],[13,24],[10,28],[9,26]] },
-  { type: 'corruption_crawler', col: 15, row: 26,
+  { type: 'corruption_crawler', col: 15, row: 26, encounter: 'exit-corridor',
     patrol: [[16,24],[17,26],[16,29],[13,27]] },
 ];
 
@@ -121,6 +122,8 @@ export class EnemyManager {
     this._corruptionPatches = []; // floor DOT zones
     this._explosions        = []; // death-explosion VFX updated by the game loop
     this._weaponLockTimer   = 0;  // game-time countdown for weapon lock
+    this._ambientWavesEnabled = false;
+    this._spawnedEncounters = new Set();
 
     // Wave system
     this._waveNum       = 1;   // current wave (1 = initial spawn)
@@ -141,11 +144,31 @@ export class EnemyManager {
         def.row * TILE + TILE / 2
       );
       const patrol = _defPatrol(def);
-      this._spawnEnemy(def.type, pos, {}, patrol);
+      this._spawnEnemy(def.type, pos, {}, patrol, def.encounter ?? 'free-roam');
     });
   }
 
-  _spawnEnemy(type, position, mults = {}, patrolPts = []) {
+  spawnEncounter(encounterId, options = {}) {
+    if (this._spawnedEncounters.has(encounterId)) return false;
+
+    const defs = SPAWN_DEFS.filter(def => def.encounter === encounterId);
+    if (defs.length === 0) return false;
+
+    defs.forEach(def => {
+      const pos = new THREE.Vector3(
+        def.col * TILE + TILE / 2,
+        0.01,
+        def.row * TILE + TILE / 2,
+      );
+      this._spawnEnemy(def.type, pos, {}, _defPatrol(def), encounterId);
+    });
+
+    this._spawnedEncounters.add(encounterId);
+    if (options.message) this._showWaveToast(options.message);
+    return true;
+  }
+
+  _spawnEnemy(type, position, mults = {}, patrolPts = [], encounterId = 'free-roam') {
     const entity = makeEnemy(type, position);
     if (!entity) return;
 
@@ -175,7 +198,7 @@ export class EnemyManager {
 
     this.scene.add(group);
 
-    this.enemies.push({ entity, sprite, group, deathTimer: -1 });
+    this.enemies.push({ entity, sprite, group, deathTimer: -1, encounterId });
   }
 
   update(dt, player, level) {
@@ -290,7 +313,7 @@ export class EnemyManager {
     this.pickups.update(dt, player);
 
     // Wave respawn
-    if (!this._bossActive) {
+    if (this._ambientWavesEnabled && !this._bossActive) {
       const living = this.enemies.filter(e => !e.entity.isDead).length;
       if (living === 0 && this._waveTimer < 0 && this._waveNum > 0) {
         // All enemies cleared — start countdown
@@ -410,6 +433,7 @@ export class EnemyManager {
         if (ws) {
           ws.lock();
           this._weaponLockTimer = 2.0;
+          EnemySounds.weaponLock();
         }
         b.mesh.geometry.dispose();
         b.mesh.material.dispose();
@@ -496,6 +520,10 @@ export class EnemyManager {
 
   suppressWaves() { this._bossActive = true;  this._waveTimer = -1; }
   resumeWaves()   { this._bossActive = false; }
+  setAmbientWavesEnabled(enabled) {
+    this._ambientWavesEnabled = enabled;
+    if (!enabled) this._waveTimer = -1;
+  }
 
   _spawnWave() {
     // Scale wave size and difficulty with wave number
@@ -542,7 +570,8 @@ export class EnemyManager {
         spawn.type,
         pos,
         { speedMult: finalSpeed, damageMult: finalDamage },
-        spawn.patrol ?? []
+        spawn.patrol ?? [],
+        options.encounterId ?? 'scripted'
       );
     });
 
@@ -574,6 +603,10 @@ export class EnemyManager {
     return this.enemies.filter(e => !e.entity.isDead).length;
   }
 
+  isEncounterSpawned(encounterId) {
+    return this._spawnedEncounters.has(encounterId);
+  }
+
   getAllEnemyEntities() {
     return this.enemies.map(e => e.entity);
   }
@@ -581,6 +614,7 @@ export class EnemyManager {
   // Returns the current wave number and, when the respawn countdown is running,
   // the seconds remaining (null when enemies are still alive).
   getWaveState() {
+    if (!this._ambientWavesEnabled) return null;
     return {
       num:      this._waveNum,
       countdown: this._waveTimer >= 0 ? this._waveTimer : null,

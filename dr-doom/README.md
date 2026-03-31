@@ -1,5 +1,5 @@
 # DR DOOM — Disaster Recovery: The Game
-### v1.2.1 — Full Build
+### v1.3.0 — Encounter Director Update
 
 > "RTO is ticking, Engineer. Pick up the Replication Shotgun and get to work."
 
@@ -11,6 +11,8 @@
 npm install
 npm run dev       # development server at localhost:3000
 npm run build     # production build to /dist
+npm run smoke     # verify the built bundles + synced release strings
+npm run debug     # build + smoke in one pass
 npm run preview   # preview production build
 ```
 
@@ -34,6 +36,12 @@ A DOOM-inspired first-person shooter set in a failing data center. You are the D
 **3 Boss Fights** — Ransomware King, Cascade Failure Titan (full), The Audit
 
 **4 Difficulty Levels** — Intern / Sysadmin / Architect / Nightmare On-Call
+
+**Encounter-directed progression** — weapons unlock through recovery milestones instead of starting with the full arsenal
+
+**Persistent operator settings** — remappable controls, look sensitivity, FOV, invert Y, and audio mix all save locally
+
+**Ranked debriefs** — every clear is graded with par-time and commendation tracking
 
 **4 Secret Rooms** — real DR architecture notes, Veeam guides, VCF runbook, BFR vault
 

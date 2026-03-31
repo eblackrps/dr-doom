@@ -15,9 +15,10 @@ Requires a desktop browser with keyboard and mouse.
 - **3 boss fights** with unique arena mechanics
 - **6 interconnected rooms** — server floor, storage vault, network core, cold aisle, management console, emergency exit
 - **DR Runbook objective system** — restore VMs, verify backup chains, check environmental systems
-- **Wave-based respawn system** with escalating difficulty
+- **Encounter-directed progression** with staged room scripting and arsenal unlocks
 - **4 difficulty levels** — Intern, Sysadmin, Architect, Nightmare
-- **Save system** with localStorage persistence
+- **Persistent settings + saves** with localStorage persistence for controls, look tuning, audio mix, and checkpoints
+- **Ranked mission debriefs** with par times, best ranks, and commendations
 - **Procedural music** — combat, boss, and exploration layers driven by Web Audio API
 
 ## Controls
@@ -28,8 +29,9 @@ Requires a desktop browser with keyboard and mouse.
 | Mouse | Look |
 | Left Click | Fire |
 | 1-7 | Switch weapon |
+| Scroll | Cycle weapon |
 | E | Interact |
-| R | Reload |
+| Space | Jump |
 | ESC | Pause |
 
 ## Tech Stack
@@ -51,6 +53,8 @@ npm run dev
 
 ```bash
 npm run build
+npm run smoke
+npm run debug
 ```
 
 Output goes to `dist/`.

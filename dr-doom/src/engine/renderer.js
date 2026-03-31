@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadGameplaySettings } from '../settings/gameplay-settings.js';
 
 // Render at full window resolution — CRT shader provides the retro aesthetic.
 // 320x240 looked terrible on modern monitors. Scanlines are now resolution-independent.
@@ -10,7 +11,7 @@ function getRenderSize() {
 }
 
 export class Renderer {
-  constructor(canvas) {
+  constructor(canvas, settings = loadGameplaySettings()) {
     this.canvas = canvas;
 
     const { w, h } = getRenderSize();
@@ -19,11 +20,11 @@ export class Renderer {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0x000000, 12, 45);
 
-    this.camera = new THREE.PerspectiveCamera(75, w / h, 0.05, 100);
+    this.camera = new THREE.PerspectiveCamera(settings.fov ?? 75, w / h, 0.05, 100);
 
     // Weapon viewmodel scene
     this.weaponScene  = new THREE.Scene();
-    this.weaponCamera = new THREE.PerspectiveCamera(75, w / h, 0.01, 10);
+    this.weaponCamera = new THREE.PerspectiveCamera(settings.fov ?? 75, w / h, 0.01, 10);
 
     // WebGL renderer at window resolution
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -186,5 +187,12 @@ export class Renderer {
     this.canvas.style.position = 'absolute';
     this.canvas.style.left = '0px';
     this.canvas.style.top  = '0px';
+  }
+
+  setFov(fov) {
+    this.camera.fov = fov;
+    this.weaponCamera.fov = fov;
+    this.camera.updateProjectionMatrix();
+    this.weaponCamera.updateProjectionMatrix();
   }
 }

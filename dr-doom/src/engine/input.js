@@ -17,11 +17,34 @@ export const DEFAULT_KEYMAP = {
   pause:        ['Escape'],
 };
 
+const KEYMAP_STORAGE_KEY = 'dr-doom-keymap';
+
+function _cloneDefaultKeymap() {
+  return Object.fromEntries(
+    Object.entries(DEFAULT_KEYMAP).map(([action, codes]) => [action, [...codes]]),
+  );
+}
+
+function _loadKeymap() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEYMAP_STORAGE_KEY) ?? '{}');
+    const merged = _cloneDefaultKeymap();
+    Object.entries(saved).forEach(([action, codes]) => {
+      if (!Array.isArray(codes) || codes.length === 0) return;
+      if (!(action in merged)) return;
+      merged[action] = codes.filter(code => typeof code === 'string');
+    });
+    return merged;
+  } catch {
+    return _cloneDefaultKeymap();
+  }
+}
+
 export class InputHandler {
   constructor(canvas, lockPrompt) {
     this.canvas = canvas;
     this.lockPrompt = lockPrompt;
-    this.keymap = { ...DEFAULT_KEYMAP };
+    this.keymap = _loadKeymap();
 
     // Current frame state
     this.keys = new Set();
@@ -114,6 +137,12 @@ export class InputHandler {
   // Remap a key action
   remap(action, codes) {
     this.keymap[action] = Array.isArray(codes) ? codes : [codes];
+    localStorage.setItem(KEYMAP_STORAGE_KEY, JSON.stringify(this.keymap));
+  }
+
+  resetKeymap() {
+    this.keymap = _cloneDefaultKeymap();
+    localStorage.setItem(KEYMAP_STORAGE_KEY, JSON.stringify(this.keymap));
   }
 
   isMouseButtonDown(button = 0) {

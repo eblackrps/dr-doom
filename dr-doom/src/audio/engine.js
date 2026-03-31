@@ -1,3 +1,5 @@
+import { DEFAULT_AUDIO_SETTINGS, loadAudioSettings } from '../settings/audio-settings.js';
+
 // DR DOOM Audio Engine
 // All sound synthesized via Web Audio API — no external assets required
 // Architecture: AudioContext → Master gain → Category gains → Effects chain → Destination
@@ -52,18 +54,7 @@ export class AudioEngine {
   }
 
   _loadSettings() {
-    try {
-      const s = JSON.parse(localStorage.getItem('dr-doom-audio') ?? '{}');
-      return {
-        master:     s.master     ?? 80,
-        sfx:        s.sfx        ?? 100,
-        music:      s.music      ?? 70,
-        ambient:    s.ambient    ?? 60,
-        bitcrush:   s.bitcrush   ?? true,
-        spatial:    s.spatial    ?? true,
-        muteFocus:  s.muteFocus  ?? true,
-      };
-    } catch { return { master:80, sfx:100, music:70, ambient:60, bitcrush:true, spatial:true, muteFocus:true }; }
+    return loadAudioSettings() ?? { ...DEFAULT_AUDIO_SETTINGS };
   }
 
   applySettings() {

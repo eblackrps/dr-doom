@@ -300,4 +300,51 @@ export const EnemySounds = {
       osc.start(t); osc.stop(t + 0.12);
     }, 'ui');
   },
+
+  statusSlow() {
+    audio.playOneShot((ctx, dest) => {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(70, t + 0.22);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.22, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+      osc.connect(g); g.connect(dest);
+      osc.start(t); osc.stop(t + 0.26);
+    }, 'ui');
+  },
+
+  weaponLock() {
+    audio.playOneShot((ctx, dest) => {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(920, t);
+      osc.frequency.linearRampToValueAtTime(320, t + 0.18);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.connect(g); g.connect(dest);
+      osc.start(t); osc.stop(t + 0.24);
+    }, 'ui');
+  },
+
+  bossVulnerable() {
+    audio.playOneShot((ctx, dest) => {
+      const t = ctx.currentTime;
+      [659, 880, 1174].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t + i * 0.05);
+        g.gain.setValueAtTime(0.18, t + i * 0.05 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.05 + 0.2);
+        osc.connect(g); g.connect(dest);
+        osc.start(t + i * 0.05); osc.stop(t + i * 0.05 + 0.22);
+      });
+    }, 'ui');
+  },
 };
