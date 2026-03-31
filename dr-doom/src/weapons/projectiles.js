@@ -1,5 +1,18 @@
 import * as THREE from 'three';
 
+function _projectileHitsTarget(projectilePos, target) {
+  const dx = projectilePos.x - target.position.x;
+  const dz = projectilePos.z - target.position.z;
+  const horizontalDist = Math.sqrt(dx * dx + dz * dz);
+  const hitRadius = target.isBoss ? 1.8 : 0.65;
+  const minY = target.position.y - 0.25;
+  const maxY = target.position.y + (target.isBoss ? 3.0 : 1.75);
+
+  return horizontalDist < hitRadius &&
+         projectilePos.y >= minY &&
+         projectilePos.y <= maxY;
+}
+
 export class ProjectileManager {
   constructor(scene) {
     this.scene = scene;
@@ -88,12 +101,14 @@ export class ProjectileManager {
       if (pos.y < 0.1 || pos.y > 3.8) hit = true;
       if (!hit && level.collidesAABB(pos, 0.15, 0.3)) hit = true;
 
-      // Check enemy hits (placeholder — Phase 3 will wire this properly)
+      // Check enemy and boss hits using horizontal radius + body height instead
+      // of raw 3D distance. Projectile weapons travel at camera height, while the
+      // entities are anchored near the floor.
       if (!hit && enemies) {
-        for (const enemy of enemies) {
-          if (enemy.isDead) continue;
-          if (pos.distanceTo(enemy.position) < 0.8) {
-            enemy.takeDamage(p.damage, p.type);
+        for (const target of enemies) {
+          if (!target || target.isDead) continue;
+          if (_projectileHitsTarget(pos, target)) {
+            target.takeDamage(p.damage, p.type);
             hit = true;
             break;
           }

@@ -93,6 +93,7 @@ export class RansomwareKing extends Boss {
     // When all 3 are shot in a cycle, boss takes full damage for a window
     this._nodeCount    = 3;
     this._nodesHit     = 0;
+    this._nodeHitSet   = new Set();
     this._nodePositions = [
       new THREE.Vector3(-0.4, 1.2, 0),
       new THREE.Vector3( 0.0, 1.8, 0),
@@ -129,14 +130,19 @@ export class RansomwareKing extends Boss {
   }
 
   hitNode(nodeIndex) {
-    this._nodesHit++;
+    if (this._nodeHitSet.has(nodeIndex)) return;
+
+    this._nodeHitSet.add(nodeIndex);
+    this._nodesHit = this._nodeHitSet.size;
+    this.pendingEvents.push({ type: 'node_hit', index: nodeIndex });
+
     if (this._nodesHit >= this._nodeCount) {
+      this._nodeHitSet.clear();
       this._nodesHit = 0;
       this._vulnerableWindow = true;
       this._vulnerableTimer = 3.5;
       this.pendingEvents.push({ type: 'nodes_cleared' });
     }
-    this.pendingEvents.push({ type: 'node_hit', index: nodeIndex });
   }
 
   _getAttackCooldown() { return Math.max(0.8, 1.5 - (this.phase - 1) * 0.3); }

@@ -54,7 +54,7 @@ export class TitleScreen {
       font-size: 9px; letter-spacing: 5px; color: #ff220088;
       margin-bottom: 12px;
     `;
-    ver.textContent = 'CLASSIFIED // DR SYSTEMS INC. // BUILD 1.0.0';
+    ver.textContent = 'CLASSIFIED // DR SYSTEMS INC. // BUILD 1.2.1';
     content.appendChild(ver);
 
     // Main ASCII logo

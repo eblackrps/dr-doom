@@ -3,7 +3,7 @@
 // Persists: difficulty, level completion, best times, kill counts, secrets found
 
 const SAVE_KEY = 'dr-doom-save';
-const VERSION  = '1.0.0';
+const VERSION  = '1.2.1';
 
 const DEFAULTS = {
   version:      VERSION,
@@ -98,12 +98,19 @@ export class SaveSystem {
 
   // ---- Boss checkpoints ----
 
-  saveCheckpoint(arenaId, player, weapons) {
+  saveCheckpoint(arenaId, player, weapons, checkpointPosition = null) {
+    const pos = checkpointPosition ?? {
+      x: player.position.x,
+      y: player.position.y,
+      z: player.position.z,
+    };
+
     this._data.checkpoint = {
       arenaId,
       playerHp:    Math.floor(player.health),
       playerArmor: Math.floor(player.armor),
       ammo: { ...weapons.ammo.counts },
+      position: pos,
       savedAt: Date.now(),
     };
     this._save();

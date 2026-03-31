@@ -79,6 +79,7 @@ function launchGame() {
   const rkArena     = new RansomwareKingArena(renderer.scene, interaction, sharedSolid);
   const ctArena     = new CascadeTitanArena(renderer.scene, interaction, sharedSolid);
   const auditArena  = new AuditArena(renderer.scene, interaction, sharedSolid);
+  let gameElapsed = 0, totalKills = 0, levelDone = false, gameOver = false;
 
   // Patch level collision to include arena walls
   const origCollide = level.collidesAABB.bind(level);
@@ -113,14 +114,21 @@ function launchGame() {
   if (auditArena.boss) {
     auditArena.boss.rtoTimer *= diff.rtoMultiplier;
     auditArena.boss.tasks.forEach(t => { t.timeLimit *= diff.rtoMultiplier; });
+    auditArena.boss._taskTimer = auditArena.boss.tasks[0]?.timeLimit ?? auditArena.boss._taskTimer;
   }
 
   enemies._diffConfig = diff;
+  auditArena.setWaveSpawner((spawns, options) => enemies.spawnScriptedWave(spawns, options));
 
   player.setPosition(level.spawnPoint);
   player.weaponSystem = weapons;
   weapons.setLevel(level);
-  weapons.setEnemies(() => enemies.getAllEnemyEntities());
+  weapons.setEnemies(() => [
+    ...enemies.getAllEnemyEntities(),
+    rkArena.boss,
+    ctArena.boss,
+    auditArena.boss,
+  ].filter(Boolean));
   enemies.setPlayerWeaponRef(player, weapons);
 
   // Restore from checkpoint
@@ -133,6 +141,10 @@ function launchGame() {
         weapons.ammo.counts[k] = v;
       });
     }
+    const checkpointPos = checkpoint.position ?? _getCheckpointSpawn(checkpoint.arenaId);
+    if (checkpointPos) {
+      player.position.set(checkpointPos.x, checkpointPos.y, checkpointPos.z);
+    }
     _showCheckpointToast(checkpoint.arenaId);
   }
 
@@ -144,6 +156,9 @@ function launchGame() {
       audio.init();
       ambient.start();
       music.start();
+      if (checkpoint?.arenaId) {
+        music.setState('boss');
+      }
       audio.applySettings();
       pauseMenu._audio = audio;
     }
@@ -203,7 +218,8 @@ function launchGame() {
     EnemySounds.pickupAmmo();
   });
 
-  const saveCheckpoint = (arenaId) => saves.saveCheckpoint(arenaId, player, weapons);
+  const saveCheckpoint = (arenaId) =>
+    saves.saveCheckpoint(arenaId, player, weapons, _getCheckpointSpawn(arenaId));
 
   // Boss sequence
   rkArena.onDefeat(() => {
@@ -258,10 +274,35 @@ function launchGame() {
     music.setState('boss');
   });
 
-  enemies.spawnAll();
+  const restoreBossCheckpoint = (arenaId) => {
+    objectives.restoreBossCheckpoint();
+    enemies.suppressWaves();
+    levelDone = true;
+
+    if (arenaId === 'ransomware-king') {
+      rkArena.activate();
+      bossHUD.show(rkArena.boss.name);
+    } else if (arenaId === 'cascade-titan') {
+      ctArena.activate();
+      bossHUD.show(ctArena.boss.name);
+    } else if (arenaId === 'the-audit') {
+      auditArena.activate();
+      bossHUD.show('THE AUDIT');
+    }
+
+    hud.faceCam?.notifyBossEntry();
+    if (audio.ready) {
+      music.setState('boss');
+    }
+  };
+
+  if (checkpoint?.arenaId) {
+    restoreBossCheckpoint(checkpoint.arenaId);
+  } else {
+    enemies.spawnAll();
+  }
 
   const hudTitle  = document.getElementById('hud-title');
-  let gameElapsed = 0, totalKills = 0, levelDone = false, gameOver = false;
   let prevCount   = enemies.getEnemyCount();
   let musicStateTimer = 0;
   const enemySoundTimers = new Map();
@@ -435,4 +476,17 @@ function _showCheckpointToast(arenaId) {
   el.textContent = `💾 CHECKPOINT RESTORED — ${arenaId.toUpperCase().replace(/-/g, ' ')}`;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 3000);
+}
+
+function _getCheckpointSpawn(arenaId) {
+  switch (arenaId) {
+    case 'ransomware-king':
+      return { x: 112, y: 1.65, z: 22 };
+    case 'cascade-titan':
+      return { x: 68, y: 1.65, z: 136 };
+    case 'the-audit':
+      return { x: 124, y: 1.65, z: 88 };
+    default:
+      return null;
+  }
 }

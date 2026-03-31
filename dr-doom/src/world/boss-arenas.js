@@ -348,6 +348,12 @@ export class RansomwareKingArena {
   _handleBossEvent(evt, player) {
     if (evt.type === 'phase_change') {
       this._showArenaMessage(`PHASE ${evt.phase} — ENCRYPTION ACCELERATING`, 0xff0066);
+    } else if (evt.type === 'node_hit') {
+      const node = this._nodes[evt.index];
+      if (node) {
+        node.hit = true;
+        node.mesh.material.color.setHex(0xffaa00);
+      }
     } else if (evt.type === 'nodes_cleared') {
       this._showArenaMessage('DECRYPTION NODES CLEARED — BOSS VULNERABLE', 0x00ffaa);
       // Decrypt all panels briefly
@@ -357,6 +363,10 @@ export class RansomwareKingArena {
           p.mesh.material.color.setHex(0x1a000a);
           if (p._lockMesh) { this.scene.remove(p._lockMesh); p._lockMesh = null; }
         }
+      });
+      this._nodes.forEach(node => {
+        node.hit = false;
+        node.mesh.material.color.setHex(0x00ffaa);
       });
     }
   }
@@ -671,6 +681,8 @@ export class AuditArena {
     this._hudEl        = null;
     this._elapsed      = 0;
     this._terminalMesh = null;
+    this._spawnWaveFn  = null;
+    this._spawnPads    = [];
 
     this._build();
   }
@@ -855,6 +867,15 @@ export class AuditArena {
         });
       }
     });
+
+    this._spawnPads = [
+      new THREE.Vector3(ox + TILE * 1.5,     0.01, oz + TILE * 2.0),
+      new THREE.Vector3(ox + W - TILE * 1.5, 0.01, oz + TILE * 2.0),
+      new THREE.Vector3(ox + TILE * 1.5,     0.01, oz + D - TILE * 2.0),
+      new THREE.Vector3(ox + W - TILE * 1.5, 0.01, oz + D - TILE * 2.0),
+      new THREE.Vector3(ox + W * 0.5,        0.01, oz + TILE * 3.0),
+      new THREE.Vector3(ox + W * 0.5,        0.01, oz + D - TILE * 2.5),
+    ];
   }
 
   _buildAuditHUD() {
@@ -882,6 +903,7 @@ export class AuditArena {
   }
 
   onComplete(fn) { this._onComplete = fn; }
+  setWaveSpawner(fn) { this._spawnWaveFn = fn; }
 
   update(dt, player, camera) {
     if (!this._active || this._complete) {
@@ -901,6 +923,11 @@ export class AuditArena {
     while (this.boss.pendingEvents.length > 0) {
       const evt = this.boss.pendingEvents.shift();
       this._handleEvent(evt, player);
+    }
+
+    if (this.boss.pendingWave) {
+      this.boss.pendingWave = false;
+      this._spawnAuditWave();
     }
 
     // Update HUD
@@ -930,6 +957,32 @@ export class AuditArena {
     } else if (evt.type === 'audit_complete') {
       this._showMsg('AUDIT PASSED — DR CERTIFICATION GRANTED', 0x00ff41);
     }
+  }
+
+  _spawnAuditWave() {
+    if (!this._spawnWaveFn || this._spawnPads.length === 0) return;
+
+    const phase = this.boss.currentTaskIndex;
+    const count = Math.min(2 + phase, this._spawnPads.length);
+    const typePool = [
+      'corruption_crawler',
+      'latency_leech',
+      ...(phase >= 1 ? ['hardware_gremlin'] : []),
+      ...(phase >= 2 ? ['network_phantom', 'ransomware_wraith'] : []),
+      ...(phase >= 3 ? ['config_drift_specter'] : []),
+    ];
+
+    const shuffledPads = [...this._spawnPads].sort(() => Math.random() - 0.5).slice(0, count);
+    const spawns = shuffledPads.map((position, idx) => ({
+      type: typePool[(phase + idx + Math.floor(Math.random() * typePool.length)) % typePool.length],
+      position,
+    }));
+
+    this._spawnWaveFn(spawns, {
+      speedMult: 1 + phase * 0.12,
+      damageMult: 1 + phase * 0.08,
+      message: `AUDIT ENFORCEMENT DEPLOYED — ${count} THREATS`,
+    });
   }
 
   _updateAuditHUD() {

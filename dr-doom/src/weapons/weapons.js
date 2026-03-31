@@ -166,6 +166,38 @@ function _hitTarget(hit) {
   return hit.object.userData.enemy || hit.object.userData.boss || null;
 }
 
+function _isHitscanBlocker(object) {
+  return !!(
+    object.userData.enemy ||
+    object.userData.boss ||
+    object.userData.bossNode ||
+    object.userData.isWall
+  );
+}
+
+function _applyDamageHit(hit, amount, type) {
+  const bossNode = hit.object.userData.bossNode;
+  if (bossNode?.hitNode) {
+    bossNode.hitNode(hit.object.userData.nodeIndex);
+    return null;
+  }
+
+  const target = _hitTarget(hit);
+  if (target) {
+    target.takeDamage(amount, type);
+    return target;
+  }
+
+  return null;
+}
+
+function _hitRegistryKey(hit) {
+  if (hit.object.userData.bossNode) {
+    return `boss-node:${hit.object.userData.nodeIndex}`;
+  }
+  return _hitTarget(hit) ?? hit.object;
+}
+
 // ---- Hitscan helper ----
 
 function castHitscan(camera, scene, range, spread = 0) {
@@ -187,7 +219,7 @@ function castHitscan(camera, scene, range, spread = 0) {
   return hits.filter(h =>
     h.distance > 0.3 &&
     h.distance < range &&
-    (h.object.userData.enemy || h.object.userData.boss || h.object.userData.isWall)
+    _isHitscanBlocker(h.object)
   );
 }
 
@@ -262,8 +294,9 @@ export class SnapshotPistol extends Weapon {
 
     projectileManager.spawnTrace(muzzleWorld, endPoint, 0x00ff88);
 
-    const target = hits.length > 0 ? _hitTarget(hits[0]) : null;
-    if (target) target.takeDamage(this.damage, 'physical');
+    if (hits.length > 0) {
+      _applyDamageHit(hits[0], this.damage, 'physical');
+    }
 
     // Hit flash effect
     if (hits.length > 0) {
@@ -357,8 +390,9 @@ export class ReplicationShotgun extends Weapon {
 
       projectileManager.spawnTrace(muzzleWorld, endPoint, 0xff8800);
 
-      const pelletTarget = hits.length > 0 ? _hitTarget(hits[0]) : null;
-      if (pelletTarget) pelletTarget.takeDamage(this.damage, 'physical');
+      if (hits.length > 0) {
+        _applyDamageHit(hits[0], this.damage, 'physical');
+      }
     }
 
     // Pump animation
@@ -494,7 +528,7 @@ export class BackupBeam extends Weapon {
     const validHit = hits.find(h =>
       h.distance > 0.3 &&
       h.distance < 25 &&
-      (h.object.userData.enemy || h.object.userData.boss || h.object.userData.isWall)
+      _isHitscanBlocker(h.object)
     );
 
     const muzzle = camera.position.clone().addScaledVector(dir, 0.6);
@@ -502,9 +536,8 @@ export class BackupBeam extends Weapon {
 
     this._renderBeam(scene, muzzle, endpoint);
 
-    const beamTarget = validHit ? _hitTarget(validHit) : null;
-    if (beamTarget) {
-      beamTarget.takeDamage(this.damage * this._stackDamage, 'backup');
+    if (validHit) {
+      _applyDamageHit(validHit, this.damage * this._stackDamage, 'backup');
     }
   }
 
@@ -697,23 +730,29 @@ export class ImmutableRailgun extends Weapon {
     // Piercing hitscan — hits everything along the ray
     const raycaster = new THREE.Raycaster();
     raycaster.set(camera.position, dir);
-    const allHits = raycaster.intersectObjects(scene.children, true)
-      .filter(h => h.distance > 0.3 && h.distance < 60);
+    const validHits = raycaster.intersectObjects(scene.children, true)
+      .filter(h => h.distance > 0.3 && h.distance < 60 && _isHitscanBlocker(h.object));
 
-    const endpoint = allHits.length > 0
-      ? allHits[allHits.length - 1].point.clone()
+    const wallIndex = validHits.findIndex(hit => hit.object.userData.isWall);
+    const damageHits = wallIndex >= 0 ? validHits.slice(0, wallIndex) : validHits;
+    const endpoint = wallIndex >= 0
+      ? validHits[wallIndex].point.clone()
+      : damageHits.length > 0
+      ? damageHits[damageHits.length - 1].point.clone()
       : from.clone().addScaledVector(dir, 60);
 
     // Railgun trace — thick, bright, with glow
     this._spawnRailTrace(scene, from, endpoint, projectileManager);
 
     // Damage all enemies/bosses hit
-    allHits.forEach(hit => {
-      const t = _hitTarget(hit);
-      if (t) {
-        t.takeDamage(this.damage, 'immutable');
-        t.applyStatus?.('locked', 1.5);
-      }
+    const seenTargets = new Set();
+    damageHits.forEach(hit => {
+      const key = _hitRegistryKey(hit);
+      if (seenTargets.has(key)) return;
+      seenTargets.add(key);
+
+      const target = _applyDamageHit(hit, this.damage, 'immutable');
+      target?.applyStatus?.('locked', 1.5);
     });
   }
 
@@ -838,9 +877,9 @@ export class CDPChaingun extends Weapon {
 
     projectileManager.spawnTrace(from, to, 0x00ff41);
 
-    const cdpTarget = hits.length > 0 ? _hitTarget(hits[0]) : null;
-    if (cdpTarget) {
-      cdpTarget.takeDamage(this.damage, 'cdp');
+    if (hits.length > 0) {
+      const cdpTarget = _applyDamageHit(hits[0], this.damage, 'cdp');
+      if (!cdpTarget) return;
 
       // CDP: auto-restore kill after 30 hits
       const count = (this._hitCounters.get(cdpTarget) ?? 0) + 1;

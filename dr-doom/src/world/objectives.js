@@ -98,6 +98,13 @@ export class ObjectiveSystem {
   onLevelComplete(fn) { this._onComplete = fn; }
   onExitReached(fn)   { this._onExitReached = fn; }
 
+  restoreBossCheckpoint() {
+    this._objectives.forEach(obj => {
+      obj.status = OBJ_STATUS.COMPLETE;
+    });
+    this.levelComplete = true;
+  }
+
   // Called when player accesses a console
   notifyConsoleAccessed(consoleId) {
     this._completedConsoles.add(consoleId);

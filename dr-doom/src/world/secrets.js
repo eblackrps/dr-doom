@@ -156,6 +156,9 @@ export class SecretManager {
 
   _buildSecret(def) {
     const already = this.saves.isSecretFound(def.id);
+    if (already) {
+      this._revealed.add(def.id);
+    }
 
     // Build trigger object — looks like a normal server rack
     const triggerX = def.triggerCol * TILE + TILE/2;

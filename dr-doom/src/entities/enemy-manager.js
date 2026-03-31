@@ -326,8 +326,15 @@ export class EnemyManager {
   }
 
   _spawnDrops(entity) {
+    const diff = this._diffConfig ?? { healthDropMult: 1, armorDropMult: 1 };
+
     entity.dropTable.forEach(drop => {
-      if (Math.random() > drop.chance) return;
+      const chanceMult =
+        drop.type === 'health' ? diff.healthDropMult :
+        drop.type === 'armor'  ? diff.armorDropMult  : 1;
+      const finalChance = Math.max(0, Math.min(1, drop.chance * chanceMult));
+
+      if (Math.random() > finalChance) return;
       const offset = new THREE.Vector3(
         (Math.random() - 0.5) * 1.5,
         0,
@@ -517,6 +524,31 @@ export class EnemyManager {
     });
 
     this._showWaveToast(`WAVE ${this._waveNum} INCOMING — ${count} THREATS DETECTED`);
+  }
+
+  spawnScriptedWave(spawns, options = {}) {
+    const baseDiff = options.ignoreDifficulty
+      ? { enemySpeedMult: 1, enemyDamageMult: 1 }
+      : (this._diffConfig ?? { enemySpeedMult: 1, enemyDamageMult: 1 });
+
+    const finalSpeed = (options.speedMult ?? 1) * baseDiff.enemySpeedMult;
+    const finalDamage = (options.damageMult ?? 1) * baseDiff.enemyDamageMult;
+
+    spawns.forEach(spawn => {
+      const pos = spawn.position?.clone
+        ? spawn.position.clone()
+        : new THREE.Vector3(spawn.position.x, spawn.position.y, spawn.position.z);
+      this._spawnEnemy(
+        spawn.type,
+        pos,
+        { speedMult: finalSpeed, damageMult: finalDamage },
+        spawn.patrol ?? []
+      );
+    });
+
+    if (options.message) {
+      this._showWaveToast(options.message);
+    }
   }
 
   _showWaveToast(msg) {

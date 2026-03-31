@@ -120,6 +120,8 @@ export class ConsoleUI {
     window.addEventListener('keydown', (e) => {
       if (!this._visible) return;
       if (e.code === 'KeyE' || e.code === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
         this.close();
       }
     });

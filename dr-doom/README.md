@@ -1,5 +1,5 @@
 # DR DOOM — Disaster Recovery: The Game
-### v1.0.0 — Full Build
+### v1.2.1 — Full Build
 
 > "RTO is ticking, Engineer. Pick up the Replication Shotgun and get to work."
 
