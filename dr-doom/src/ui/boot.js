@@ -27,11 +27,29 @@ const BOOT_LINES = [
   { text: 'RTO IS TICKING, ENGINEER. PICK UP THE REPLICATION SHOTGUN.', cls: 'err', delay: 3050 },
 ];
 
+function isForwardedStart() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return window.self !== window.top || params.has('ref');
+  } catch {
+    return true;
+  }
+}
+
 export function boot() {
   return new Promise((resolve) => {
     const log = document.getElementById('boot-log');
     const prompt = document.getElementById('boot-prompt');
     const bootScreen = document.getElementById('boot-screen');
+    const requireKeyboardConfirm = isForwardedStart();
+    let readyToDismiss = false;
+    let dismissed = false;
+
+    if (prompt) {
+      prompt.textContent = requireKeyboardConfirm
+        ? '▸ PRESS ENTER TO CONTINUE'
+        : '▸ CLICK OR PRESS ENTER TO CONTINUE';
+    }
 
     // Render each line with its delay
     BOOT_LINES.forEach(({ text, cls, delay }) => {
@@ -52,11 +70,21 @@ export function boot() {
     // Show "click to start" after last line
     const lastDelay = BOOT_LINES[BOOT_LINES.length - 1].delay + 400;
     setTimeout(() => {
+      readyToDismiss = true;
       prompt.style.display = 'block';
     }, lastDelay);
 
-    // Dismiss on click or Enter
+    const handleKeydown = (e) => {
+      if (e.code === 'Enter' || (!requireKeyboardConfirm && e.code === 'Space')) dismiss();
+    };
+
+    const handleClick = () => dismiss();
+
     const dismiss = () => {
+      if (dismissed || !readyToDismiss) return;
+      dismissed = true;
+      bootScreen?.removeEventListener('click', handleClick);
+      window.removeEventListener('keydown', handleKeydown);
       bootScreen.style.transition = 'opacity 0.4s';
       bootScreen.style.opacity = '0';
       setTimeout(() => {
@@ -65,9 +93,10 @@ export function boot() {
       }, 400);
     };
 
-    bootScreen.addEventListener('click', dismiss, { once: true });
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Enter' || e.code === 'Space') dismiss();
-    }, { once: true });
+    if (!requireKeyboardConfirm) {
+      bootScreen.addEventListener('click', handleClick);
+    }
+
+    window.addEventListener('keydown', handleKeydown);
   });
 }
