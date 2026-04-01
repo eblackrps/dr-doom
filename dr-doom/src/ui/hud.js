@@ -18,6 +18,7 @@ export class HUD {
     this._lastUnlockedKey = '';
     this._lastWaveStr = '';
     this._lastStatusKey = '';
+    this._lastTargetKey = '';
 
     this._waveInfoEl = document.getElementById('wave-info');
     this._waveNumEl = document.getElementById('wave-num');
@@ -59,7 +60,7 @@ export class HUD {
     panel.style.cssText = `
       position:absolute;
       right:14px;
-      top:196px;
+      top:268px;
       width:180px;
       display:none;
       border:1px solid #102316;
@@ -68,9 +69,24 @@ export class HUD {
     `;
     hud.appendChild(panel);
     this._statusEl = panel;
+
+    const target = document.createElement('div');
+    target.id = 'target-panel';
+    target.style.cssText = `
+      position:absolute;
+      right:14px;
+      top:188px;
+      width:180px;
+      display:none;
+      border:1px solid #102316;
+      background:rgba(0,0,0,0.55);
+      padding:8px 10px;
+    `;
+    hud.appendChild(target);
+    this._targetEl = target;
   }
 
-  update(player, weapons, elapsed, isBossFight = false, waveState = null, dt = 1 / 60, statusState = {}) {
+  update(player, weapons, elapsed, isBossFight = false, waveState = null, dt = 1 / 60, statusState = {}, navigationTarget = null) {
     const hp = Math.max(0, Math.floor(player.health));
     if (hp !== this._lastHealth) {
       this.health.textContent = `${hp}%`;
@@ -126,7 +142,8 @@ export class HUD {
 
     this.faceCam?.update(dt, player, isBossFight);
     this._updateWaveInfo(waveState);
-    this._updateStatusPanel(statusState);
+    this._updateTargetPanel(player, navigationTarget);
+    this._updateStatusPanel(statusState, weapons);
 
     if (this.coords) {
       const pos = player.getPosition();
@@ -181,10 +198,43 @@ export class HUD {
     }
   }
 
-  _updateStatusPanel(statusState) {
+  _updateTargetPanel(player, navigationTarget) {
+    if (!this._targetEl) return;
+    if (!navigationTarget?.position) {
+      this._targetEl.style.display = 'none';
+      this._targetEl.innerHTML = '';
+      this._lastTargetKey = '';
+      return;
+    }
+
+    const dx = navigationTarget.position.x - player.position.x;
+    const dz = navigationTarget.position.z - player.position.z;
+    const distance = Math.max(0, Math.round(Math.sqrt(dx * dx + dz * dz)));
+    const targetKey = `${navigationTarget.kind ?? 'objective'}:${navigationTarget.label}:${distance}`;
+    if (targetKey === this._lastTargetKey) return;
+    this._lastTargetKey = targetKey;
+
+    const color = navigationTarget.kind === 'boss' ? '#ff4400' : '#ffaa00';
+    const heading = navigationTarget.kind === 'boss' ? 'PRIORITY TARGET' : 'RUNBOOK TARGET';
+
+    this._targetEl.style.display = 'block';
+    this._targetEl.innerHTML = `
+      <div style="font-size:8px;letter-spacing:2px;color:#365236;margin-bottom:6px;">${heading}</div>
+      <div style="font-size:9px;letter-spacing:2px;color:${color};text-shadow:0 0 8px ${color}55;">${navigationTarget.label}</div>
+      <div style="margin-top:6px;font-size:8px;line-height:1.7;letter-spacing:1px;color:#6f8c6f;">
+        DIST ${distance}m // FOLLOW THE MINIMAP PING
+      </div>
+    `;
+  }
+
+  _updateStatusPanel(statusState, weapons) {
     if (!this._statusEl) return;
 
     const statuses = [];
+    const currentAmmo = weapons?.getCurrentAmmo?.();
+    if (Number.isFinite(currentAmmo) && currentAmmo <= 5) {
+      statuses.push(['LOW AMMO', '#ff8800', `Only ${currentAmmo} rounds remain in the current weapon.`]);
+    }
     if (statusState.locked) statuses.push(['WEAPON LOCK', '#ff2200', 'ENCRYPTION BOLT INTERFERENCE']);
     if (statusState.slowed) statuses.push(['MOVEMENT SLOW', '#ffaa00', `${Math.ceil(statusState.slowRemaining ?? 0)}s remaining`]);
     if (statusState.fireRateSlowed) statuses.push(['FIRE-RATE SLOW', '#ff8800', `${Math.ceil(statusState.fireRateSlowRemaining ?? 0)}s remaining`]);

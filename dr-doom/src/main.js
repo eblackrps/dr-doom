@@ -28,6 +28,24 @@ import { saves }             from './save/save-system.js';
 import { loadGameplaySettings } from './settings/gameplay-settings.js';
 import { EncounterDirector } from './world/encounters.js';
 
+const ALL_WEAPON_SLOTS = [1, 2, 3, 4, 5, 6, 7];
+
+const STARTING_ARSENAL = {
+  health: 100,
+  armor: 30,
+  currentSlot: 1,
+  ammo: {
+    STORAGE_UNITS: 120,
+    REPLICA_CHARGES: 24,
+    BACKUP_CAPACITY: 180,
+    FAILOVER_TOKENS: 8,
+    IMMUTABLE_LOCKS: 8,
+    CDP_POINTS: 180,
+    BFR_CELLS: 1,
+  },
+  toast: 'ARSENAL SYNC // FULL LOADOUT ONLINE',
+};
+
 const RUNBOOK_DOOR_UNLOCKS = {
   'console-spawn-overview': {
     doorId: 'door-ab',
@@ -55,7 +73,7 @@ const BOSS_LOADOUTS = {
   'ransomware-king': {
     health: 80,
     armor: 55,
-    unlockSlots: [2, 4, 5],
+    unlockSlots: ALL_WEAPON_SLOTS,
     ammo: {
       REPLICA_CHARGES: 18,
       FAILOVER_TOKENS: 5,
@@ -66,7 +84,7 @@ const BOSS_LOADOUTS = {
   'cascade-titan': {
     health: 95,
     armor: 75,
-    unlockSlots: [2, 3, 4, 5, 6],
+    unlockSlots: ALL_WEAPON_SLOTS,
     ammo: {
       REPLICA_CHARGES: 20,
       BACKUP_CAPACITY: 160,
@@ -79,7 +97,7 @@ const BOSS_LOADOUTS = {
   'the-audit': {
     health: 100,
     armor: 85,
-    unlockSlots: [2, 3, 4, 5, 6, 7],
+    unlockSlots: ALL_WEAPON_SLOTS,
     ammo: {
       REPLICA_CHARGES: 24,
       BACKUP_CAPACITY: 180,
@@ -241,7 +259,7 @@ function launchGame(startMode = 'resume') {
   if (checkpoint) {
     player.health = checkpoint.playerHp;
     player.armor  = checkpoint.playerArmor;
-    weapons.restoreUnlockedSlots(checkpoint.unlockedSlots ?? [1]);
+    weapons.restoreUnlockedSlots(checkpoint.unlockedSlots ?? ALL_WEAPON_SLOTS);
     if (checkpoint.ammo) {
       Object.entries(checkpoint.ammo).forEach(([k, v]) => {
         weapons.ammo.counts[k] = v;
@@ -251,9 +269,17 @@ function launchGame(startMode = 'resume') {
     if (checkpointPos) {
       player.position.set(checkpointPos.x, checkpointPos.y, checkpointPos.z);
     }
+    applyStartingArsenal({
+      silent: true,
+      preserveAmmo: true,
+      preserveVitals: true,
+      currentSlot: checkpoint.currentSlot ?? STARTING_ARSENAL.currentSlot,
+    });
     unlockAllProgressionDoors({ silent: true });
     applyBossLoadout(checkpoint.arenaId, { silent: true });
     _showCheckpointToast(checkpoint.arenaId);
+  } else {
+    applyStartingArsenal({ silent: true, currentSlot: STARTING_ARSENAL.currentSlot });
   }
 
   // Init audio on first pointer lock (user gesture required by Web Audio API)
@@ -343,13 +369,38 @@ function launchGame(startMode = 'resume') {
 
   // BFR secret pickup via custom event
   window.addEventListener('bfr-secret-found', () => {
-    weapons.unlockSlot(7, { ammoType: 'BFR_CELLS', amount: 2 });
+    const unlocked = weapons.unlockSlot(7, { ammoType: 'BFR_CELLS', amount: 2 });
     EnemySounds.pickupAmmo();
-    _showSystemToast('ARSENAL OVERRIDE // BFR-9000 AUTHORIZED', '#00ff41');
+    _showSystemToast(
+      unlocked ? 'ARSENAL OVERRIDE // BFR-9000 AUTHORIZED' : 'BFR CACHE // CELLS REPLENISHED',
+      '#00ff41',
+    );
   });
 
   const saveCheckpoint = (arenaId) =>
     saves.saveCheckpoint(arenaId, player, weapons, _getCheckpointSpawn(arenaId));
+
+  const applyStartingArsenal = (options = {}) => {
+    weapons.restoreUnlockedSlots(ALL_WEAPON_SLOTS);
+    Object.entries(STARTING_ARSENAL.ammo).forEach(([ammoType, amount]) => {
+      if (options.preserveAmmo) {
+        weapons.ammo.set(ammoType, Math.max(weapons.ammo.get(ammoType), amount));
+      } else {
+        weapons.ammo.set(ammoType, amount);
+      }
+    });
+    if (!options.preserveVitals) {
+      player.health = Math.max(player.health, STARTING_ARSENAL.health);
+      player.armor = Math.max(player.armor, STARTING_ARSENAL.armor);
+    }
+    if (options.currentSlot != null) {
+      weapons.setCurrentSlot(options.currentSlot);
+    }
+    if (!options.silent) {
+      EnemySounds.pickupAmmo();
+      _showSystemToast(STARTING_ARSENAL.toast, '#00ff41');
+    }
+  };
 
   const unlockAllProgressionDoors = (options = {}) => {
     Object.values(RUNBOOK_DOOR_UNLOCKS).forEach(({ doorId }) => {
@@ -370,6 +421,7 @@ function launchGame(startMode = 'resume') {
     const loadout = BOSS_LOADOUTS[arenaId];
     if (!loadout) return;
 
+    applyStartingArsenal({ silent: true, preserveAmmo: true, preserveVitals: true });
     player.health = Math.max(player.health, loadout.health);
     player.armor = Math.max(player.armor, loadout.armor);
     loadout.unlockSlots.forEach(slot => weapons.unlockSlot(slot));
@@ -386,25 +438,25 @@ function launchGame(startMode = 'resume') {
   const getNavigationTarget = () => {
     if (auditArena._active && !auditArena._complete) {
       const pos = auditArena.getNavigationTarget();
-      return pos ? { position: pos, label: 'THE AUDIT' } : null;
+      return pos ? { position: pos, label: 'THE AUDIT', kind: 'boss' } : null;
     }
     if (ctArena._active && !ctArena._bossDefeated) {
       const pos = ctArena.getNavigationTarget();
-      return pos ? { position: pos, label: ctArena.boss?.name ?? 'CASCADE FAILURE TITAN' } : null;
+      return pos ? { position: pos, label: ctArena.boss?.name ?? 'CASCADE FAILURE TITAN', kind: 'boss' } : null;
     }
     if (rkArena._active && !rkArena._bossDefeated) {
       const pos = rkArena.getNavigationTarget();
-      return pos ? { position: pos, label: rkArena.boss?.name ?? 'RANSOMWARE KING' } : null;
+      return pos ? { position: pos, label: rkArena.boss?.name ?? 'RANSOMWARE KING', kind: 'boss' } : null;
     }
 
     const target = objectives.getNavigationTarget();
     if (!target) return null;
     if (target.consoleId) {
       const pos = level.getConsolePosition(target.consoleId);
-      return pos ? { position: pos, label: target.label } : null;
+      return pos ? { position: pos, label: target.label, kind: 'objective' } : null;
     }
     if (target.position) {
-      return { position: target.position, label: target.label };
+      return { position: target.position, label: target.label, kind: 'objective' };
     }
     return null;
   };
@@ -615,13 +667,14 @@ function launchGame(startMode = 'resume') {
       ctArena._active ? ctArena.boss :
       rkArena._active ? rkArena.boss :
       null;
+    const navigationTarget = getNavigationTarget();
     hud.update(player, weapons, elapsed, inBossFight(), enemies.getWaveState(), dt, {
       ...player.getStatusState(),
       ...weapons.getStatusState(),
       bossVulnerable: activeBoss?.isVulnerable?.() ?? false,
-    });
+    }, navigationTarget);
     objHUD.update(objectives.getObjectives(), objectives.getPrimaryObjective());
-    minimap.update(player.getPosition(), player.yaw, enemies.getAllEnemyEntities(), getNavigationTarget());
+    minimap.update(player.getPosition(), player.yaw, enemies.getAllEnemyEntities(), navigationTarget);
 
     if (hudTitle) {
       const count = enemies.getEnemyCount();

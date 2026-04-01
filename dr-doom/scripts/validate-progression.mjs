@@ -6,6 +6,8 @@ import { BOSS_ARENA_LAYOUTS } from '../src/world/boss-arenas.js';
 import { LEVEL1_OBJECTIVES, OBJ_TYPE } from '../src/world/objectives.js';
 import { RansomwareKing, CascadeFailureTitanFull, TheAudit } from '../src/entities/bosses.js';
 import { DAMAGE_TYPES } from '../src/entities/entity.js';
+import { AMMO_TYPES } from '../src/weapons/ammo.js';
+import { WeaponSystem } from '../src/weapons/weapon-system.js';
 
 const errors = [];
 
@@ -150,9 +152,21 @@ function validateBossKillability() {
   ensure(audit.auditComplete && audit.isDead, 'The Audit cannot complete through the task sequence.');
 }
 
+function validateStartingArsenal() {
+  Object.entries(AMMO_TYPES).forEach(([ammoType, def]) => {
+    ensure(def.start > 0, `Starting arsenal regression: ${ammoType} starts with no ammo.`);
+  });
+
+  const weapons = new WeaponSystem(new THREE.Scene(), new THREE.Scene());
+  const unlocked = weapons.getUnlockedSlots();
+  ensure(unlocked.length === 7, 'Starting arsenal regression: not all seven weapons are unlocked on spawn.');
+  ensure(unlocked.every((slot, index) => slot === index + 1), 'Starting arsenal regression: unlocked weapon slots are out of order.');
+}
+
 validateArenaReachability();
 validateObjectives();
 validateBossKillability();
+validateStartingArsenal();
 
 if (errors.length > 0) {
   console.error('Progression validation failed:');
@@ -165,3 +179,4 @@ console.log('- boss arena openings are connected to the main map');
 console.log('- checkpoint spawns route into their boss rooms');
 console.log('- exit objective requires the live gate console interaction');
 console.log('- all bosses can reach a terminal win/defeat state');
+console.log('- the player spawns with the full arsenal and ammo');

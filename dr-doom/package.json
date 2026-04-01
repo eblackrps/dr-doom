@@ -1,6 +1,6 @@
 {
   "name": "dr-doom",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "DR DOOM: Disaster Recovery — The Game",
   "type": "module",
   "scripts": {

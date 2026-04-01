@@ -3,37 +3,37 @@ import { EnemySounds } from '../audio/enemies.js';
 const ROOM_ZONES = {
   'server-floor': {
     label: 'MAIN SERVER FLOOR',
-    hint: 'Snapshot Pistol online. Clear crawlers first, then force the wraiths off their lanes.',
+    hint: 'Full arsenal is online. Start disciplined here and save the heavy ammo for the connectors and bosses.',
     minX: 1 * 4,  maxX: 12 * 4,
     minZ: 1 * 4,  maxZ: 10 * 4,
   },
   'storage-vault': {
     label: 'STORAGE VAULT',
-    hint: 'Replication Shotgun deployed. Use it to thin the leeches before the gremlins can close.',
+    hint: 'Shotgun and beam lanes both work here. Use the console for intel, then top off before the vault wave folds inward.',
     minX: 14 * 4, maxX: 27 * 4,
     minZ: 1 * 4,  maxZ: 10 * 4,
   },
   'network-core': {
     label: 'NETWORK CORE',
-    hint: 'Immutable Railgun authorized. Phantoms and drift specters fold when you pierce the lane.',
+    hint: 'Railgun lanes are strongest here. Hold the spine and punish phantoms before they stack in the core.',
     minX: 1 * 4,  maxX: 11 * 4,
     minZ: 13 * 4, maxZ: 20 * 4,
   },
   'cold-aisle': {
     label: 'COLD AISLE',
-    hint: 'Failover Launcher unlocked. Splash clustered threats before they pin you on the raised floor.',
+    hint: 'Use splash to break the raised-floor clumps, then keep moving so the aisle never turns into a funnel.',
     minX: 13 * 4, maxX: 19 * 4,
     minZ: 13 * 4, maxZ: 20 * 4,
   },
   'management': {
     label: 'MANAGEMENT CONSOLES',
-    hint: 'CDP Chaingun spun up. Keep pressure on morphing targets before they flood the room.',
+    hint: 'Chaingun pressure wins here. Keep the specters from stabilizing and use the consoles to reload the right tools.',
     minX: 21 * 4, maxX: 27 * 4,
     minZ: 13 * 4, maxZ: 20 * 4,
   },
   'exit-corridor': {
     label: 'EMERGENCY EXIT',
-    hint: 'Final containment sweep. Clear the corridor and expect a heavy contact at the gate.',
+    hint: 'Final containment sweep. Expect a reinforcement burst once you commit to the gate route.',
     minX: 9 * 4,  maxX: 18 * 4,
     minZ: 23 * 4, maxZ: 30 * 4,
   },
@@ -45,7 +45,7 @@ const CONSOLE_PROGRESS = {
       slot: 2,
       name: 'REPLICATION SHOTGUN',
       ammoType: 'REPLICA_CHARGES',
-      amount: 14,
+      amount: 10,
       reason: 'Storage vault breach confirmed',
     },
     encounter: {
@@ -58,7 +58,7 @@ const CONSOLE_PROGRESS = {
       slot: 3,
       name: 'BACKUP BEAM',
       ammoType: 'BACKUP_CAPACITY',
-      amount: 120,
+      amount: 90,
       reason: 'Incremental restore channel online',
     },
   },
@@ -67,7 +67,7 @@ const CONSOLE_PROGRESS = {
       slot: 5,
       name: 'IMMUTABLE RAILGUN',
       ammoType: 'IMMUTABLE_LOCKS',
-      amount: 6,
+      amount: 4,
       reason: 'Hardened repository validated',
     },
     encounter: {
@@ -80,7 +80,7 @@ const CONSOLE_PROGRESS = {
       slot: 4,
       name: 'FAILOVER LAUNCHER',
       ammoType: 'FAILOVER_TOKENS',
-      amount: 5,
+      amount: 4,
       reason: 'Spine route restored',
     },
     encounter: {
@@ -93,7 +93,7 @@ const CONSOLE_PROGRESS = {
       slot: 6,
       name: 'CDP CHAINGUN',
       ammoType: 'CDP_POINTS',
-      amount: 120,
+      amount: 90,
       reason: 'Thermal control stable',
     },
     encounter: {
@@ -110,6 +110,7 @@ export class EncounterDirector {
     this._visitedRooms = new Set();
     this._handledConsoles = new Set();
     this._finalSweepTriggered = false;
+    this._exitPressureTriggered = false;
   }
 
   startMission() {
@@ -117,6 +118,11 @@ export class EncounterDirector {
     this.enemies.spawnEncounter('server-floor', {
       message: 'MAIN SERVER FLOOR HOT // INITIAL CONTACTS ON YOUR LEVEL',
     });
+    this._showToast(
+      'ARSENAL SYNC // FULL LOADOUT ONLINE',
+      '#00ff41',
+      'All seven recovery tools are loaded. Use each room console for runbook intel and targeted resupplies.',
+    );
   }
 
   handleConsoleAccessed(consoleId) {
@@ -133,8 +139,8 @@ export class EncounterDirector {
       });
       this._showToast(
         unlocked
-          ? `ARSENAL UPGRADE // ${progress.weapon.name} ONLINE`
-          : `${progress.weapon.name} RESUPPLIED`,
+          ? `SPECIALTY CACHE // ${progress.weapon.name} ONLINE`
+          : `SPECIALTY CACHE // ${progress.weapon.name} REPLENISHED`,
         '#00ff41',
         progress.weapon.reason,
       );
@@ -151,6 +157,7 @@ export class EncounterDirector {
   update(playerPos, objectives) {
     this._showRoomBriefings(playerPos);
     this._triggerFinalSweep(objectives);
+    this._triggerExitPressure(playerPos, objectives);
   }
 
   _showRoomBriefings(playerPos) {
@@ -193,6 +200,38 @@ export class EncounterDirector {
       'RUNBOOK UPDATE // FINAL CONTAINMENT SWEEP',
       '#ff8800',
       'All systems restored. Clear the exit corridor before you trigger the boss lockdown.',
+    );
+  }
+
+  _triggerExitPressure(playerPos, objectives) {
+    if (!this._finalSweepTriggered || this._exitPressureTriggered) return;
+    const clearSweep = objectives.find(obj => obj.id === 'obj-clear-threats');
+    if (!clearSweep || clearSweep.status !== 'active') return;
+
+    const zone = ROOM_ZONES['exit-corridor'];
+    if (
+      playerPos.x < zone.minX || playerPos.x > zone.maxX ||
+      playerPos.z < zone.minZ || playerPos.z > zone.maxZ
+    ) {
+      return;
+    }
+
+    this._exitPressureTriggered = true;
+    this.enemies.spawnScriptedWave([
+      { type: 'hardware_gremlin', position: { x: 42, y: 0.01, z: 108 } },
+      { type: 'network_phantom', position: { x: 58, y: 0.01, z: 110 } },
+      { type: 'latency_leech', position: { x: 50, y: 0.01, z: 116 } },
+      { type: 'ransomware_wraith', position: { x: 64, y: 0.01, z: 102 } },
+    ], {
+      speedMult: 1.12,
+      damageMult: 1.08,
+      encounterId: 'exit-pressure',
+      message: 'EXIT PRESSURE // REINFORCEMENTS COLLAPSING ON THE GATE',
+    });
+    this._showToast(
+      'RUNBOOK UPDATE // HOLD THE GATE',
+      '#ff4400',
+      'The corridor is trying to fold shut. Break this pressure wave before you authorize the descent.',
     );
   }
 

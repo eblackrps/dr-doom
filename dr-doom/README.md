@@ -1,5 +1,5 @@
 # DR DOOM — Disaster Recovery: The Game
-### v1.4.0 — Progression Integrity Update
+### v1.5.0 — Full Arsenal And Stability Update
 
 > "RTO is ticking, Engineer. Pick up the Replication Shotgun and get to work."
 
@@ -38,15 +38,17 @@ A DOOM-inspired first-person shooter set in a failing data center. You are the D
 
 **4 Difficulty Levels** — Intern / Sysadmin / Architect / Nightmare On-Call
 
-**Progression integrity pass** — boss arenas now open through real map geometry, guided runbook routing, and checkpoint-safe world state
+**Full starting arsenal restored** — every weapon is back in inventory at spawn with stocked ammo, while room consoles now serve as tactical resupply points
 
-**Encounter-directed progression** — weapons unlock through recovery milestones instead of starting with the full arsenal
+**Connector stability pass** — boss transition corridors now use offset blackout surfaces and steadier screen-darkening so the black passageways stop flickering
+
+**Pressure and readability upgrades** — active target distance, boss/objective minimap pings, stronger final-sweep reinforcements, and low-ammo HUD warnings keep the action legible
 
 **Persistent operator settings** — remappable controls, look sensitivity, FOV, invert Y, and audio mix all save locally
 
 **Ranked debriefs** — every clear is graded with par-time and commendation tracking
 
-**Boss navigation + fail-safes** — minimap objective markers, boss-specific HUD tips, highlighted Audit consoles, and recovery loadout syncs keep every boss reachable and killable
+**Boss navigation + fail-safes** — minimap objective markers, boss-specific HUD tips, highlighted Audit consoles, checkpoint weapon restore, and recovery loadout syncs keep every boss reachable and killable
 
 **4 Secret Rooms** — real DR architecture notes, Veeam guides, VCF runbook, BFR vault
 

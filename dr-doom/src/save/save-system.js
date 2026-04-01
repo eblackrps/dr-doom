@@ -3,7 +3,7 @@
 // Persists: difficulty, level completion, best times, kill counts, secrets found
 
 const SAVE_KEY = 'dr-doom-save';
-const VERSION  = '1.4.0';
+const VERSION  = '1.5.0';
 
 const DEFAULTS = {
   version:      VERSION,
@@ -121,6 +121,7 @@ export class SaveSystem {
       playerArmor: Math.floor(player.armor),
       ammo: { ...weapons.ammo.counts },
       unlockedSlots: weapons.getUnlockedSlots?.() ?? [1],
+      currentSlot: weapons.getSlot?.() ?? 1,
       position: pos,
       savedAt: Date.now(),
     };

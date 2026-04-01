@@ -93,14 +93,28 @@ export class Minimap {
       const targetX = (objectiveTarget.position.x / (WORLD_COLS * TILE)) * s;
       const targetY = (objectiveTarget.position.z / (WORLD_ROWS * TILE)) * s;
       const pulse = 2.2 + Math.sin(performance.now() * 0.008) * 1.2;
-      ctx.strokeStyle = '#ffaa00';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(targetX, targetY, pulse, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(targetX, targetY, Math.max(1.5, pulse - 2), 0, Math.PI * 2);
-      ctx.stroke();
+      if (objectiveTarget.kind === 'boss') {
+        ctx.strokeStyle = '#ff4400';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(targetX, targetY, pulse + 1.2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(targetX - (pulse + 2), targetY);
+        ctx.lineTo(targetX + (pulse + 2), targetY);
+        ctx.moveTo(targetX, targetY - (pulse + 2));
+        ctx.lineTo(targetX, targetY + (pulse + 2));
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(targetX, targetY, pulse, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(targetX, targetY, Math.max(1.5, pulse - 2), 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
 
     // Enemies — directional triangles.

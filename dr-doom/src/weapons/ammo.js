@@ -1,12 +1,12 @@
 // Ammo type definitions and starting quantities
 export const AMMO_TYPES = {
-  STORAGE_UNITS:    { name: 'STORAGE',   max: 200, start: 90 }, // Snapshot Pistol
-  REPLICA_CHARGES:  { name: 'REPLICA',   max: 50,  start: 0  }, // Replication Shotgun
-  BACKUP_CAPACITY:  { name: 'BACKUP',    max: 300, start: 0  }, // Backup Beam (beam ticks)
-  FAILOVER_TOKENS:  { name: 'FAILOVER',  max: 20,  start: 0  }, // Failover Launcher
-  IMMUTABLE_LOCKS:  { name: 'IMMUTABLE', max: 15,  start: 0  }, // Immutable Railgun
-  CDP_POINTS:       { name: 'CDP',       max: 400, start: 0  }, // CDP Chaingun
-  BFR_CELLS:        { name: 'BFR',       max: 3,   start: 0  }, // BFR-9000
+  STORAGE_UNITS:    { name: 'STORAGE',   max: 200, start: 120 }, // Snapshot Pistol
+  REPLICA_CHARGES:  { name: 'REPLICA',   max: 50,  start: 24  }, // Replication Shotgun
+  BACKUP_CAPACITY:  { name: 'BACKUP',    max: 300, start: 180 }, // Backup Beam (beam ticks)
+  FAILOVER_TOKENS:  { name: 'FAILOVER',  max: 20,  start: 8   }, // Failover Launcher
+  IMMUTABLE_LOCKS:  { name: 'IMMUTABLE', max: 15,  start: 8   }, // Immutable Railgun
+  CDP_POINTS:       { name: 'CDP',       max: 400, start: 180 }, // CDP Chaingun
+  BFR_CELLS:        { name: 'BFR',       max: 3,   start: 1   }, // BFR-9000
 };
 
 export class AmmoPool {

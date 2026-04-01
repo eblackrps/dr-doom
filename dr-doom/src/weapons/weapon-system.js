@@ -39,7 +39,7 @@ export class WeaponSystem {
     this._locked = false;  // true while an encryption bolt effect is active
     this._fireRateSlowTimer = 0;
     this._fireRateSlowScale = 1;
-    this._unlockedSlots = new Set([1]);
+    this._unlockedSlots = new Set(Array.from({ length: this.weapons.length }, (_, index) => index + 1));
 
     // Start with weapon 1 drawn
     this.weapons[0].switchTo();
@@ -156,7 +156,9 @@ export class WeaponSystem {
       slots
         .filter(slot => Number.isInteger(slot) && slot >= 1 && slot <= this.weapons.length),
     );
-    if (restored.size === 0) restored.add(1);
+    if (restored.size === 0) {
+      for (let slot = 1; slot <= this.weapons.length; slot++) restored.add(slot);
+    }
     this._unlockedSlots = restored;
     if (!this.isSlotUnlocked(this.currentSlot + 1)) {
       const firstUnlocked = Math.min(...this._unlockedSlots) - 1;
@@ -200,6 +202,21 @@ export class WeaponSystem {
 
   getSlot() {
     return this.currentSlot + 1;
+  }
+
+  setCurrentSlot(slot) {
+    const index = slot - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= this.weapons.length) return false;
+    if (!this.isSlotUnlocked(slot)) return false;
+
+    this.currentSlot = index;
+    this._pendingSlot = -1;
+    this.weapons.forEach((weapon, weaponIndex) => {
+      weapon.visible = weaponIndex === index;
+      weapon.switchState = weaponIndex === index ? 'idle' : 'down';
+    });
+    this.weapons[index].switchTo();
+    return true;
   }
 }
 

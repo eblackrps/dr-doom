@@ -15,6 +15,18 @@ import { EnemySounds } from '../audio/enemies.js';
 
 const TILE = 4;
 
+function pulseOverlay(steps) {
+  const overlay = document.getElementById('damage-overlay');
+  if (!overlay) return;
+
+  steps.forEach(({ delay, background = '', boxShadow = '' }) => {
+    setTimeout(() => {
+      overlay.style.background = background;
+      overlay.style.boxShadow = boxShadow;
+    }, delay);
+  });
+}
+
 // Spawn definitions scattered across all 6 rooms.
 // `patrol` is an array of [col, row] waypoints. Enemies with ≥2 waypoints start
 // in PATROL state and walk the loop at half-speed; they switch to CHASE on sight.
@@ -482,11 +494,12 @@ export class EnemyManager {
     const ov = document.getElementById('damage-overlay');
 
     if (evt === 'lights_flicker') {
-      document.body.style.transition = 'filter 0.1s';
-      document.body.style.filter = 'brightness(0.3)';
-      setTimeout(() => { document.body.style.filter = ''; },            200);
-      setTimeout(() => { document.body.style.filter = 'brightness(0.5)'; }, 300);
-      setTimeout(() => { document.body.style.filter = ''; },            450);
+      pulseOverlay([
+        { delay: 0,   background: 'rgba(0,0,0,0.32)' },
+        { delay: 160, background: '' },
+        { delay: 260, background: 'rgba(0,0,0,0.18)' },
+        { delay: 420, background: '' },
+      ]);
 
     } else if (evt === 'alarm') {
       if (ov) {
@@ -500,9 +513,10 @@ export class EnemyManager {
         ov.style.boxShadow = 'inset 0 0 60px #ff880099';
         setTimeout(() => { ov.style.boxShadow = ''; }, 700);
       }
-      document.body.style.transition = 'filter 0.15s';
-      document.body.style.filter = 'brightness(1.8) sepia(0.4)';
-      setTimeout(() => { document.body.style.filter = ''; }, 400);
+      pulseOverlay([
+        { delay: 0, background: 'rgba(255,170,80,0.12)' },
+        { delay: 220, background: '' },
+      ]);
 
     } else if (evt === 'phase3') {
       this._showWaveToast('CASCADE PHASE 3 — CRITICAL FAILURE IMMINENT');
@@ -512,9 +526,12 @@ export class EnemyManager {
         setTimeout(() => { ov.style.boxShadow = 'inset 0 0 90px #ff000099'; }, 750);
         setTimeout(() => { ov.style.boxShadow = ''; },                       1000);
       }
-      document.body.style.transition = 'filter 0.1s';
-      document.body.style.filter = 'brightness(2.5) saturate(2)';
-      setTimeout(() => { document.body.style.filter = ''; }, 300);
+      pulseOverlay([
+        { delay: 0,   background: 'rgba(255,80,80,0.14)' },
+        { delay: 160, background: '' },
+        { delay: 260, background: 'rgba(255,120,80,0.08)' },
+        { delay: 420, background: '' },
+      ]);
     }
   }
 

@@ -159,13 +159,15 @@ function buildArenaRoom(scene, originX, originZ, width, depth, wallColor, floorC
   return { cx, cz, W, D, originX, originZ, wallCells };
 }
 
-function buildCorridor(scene, x, z, width, depth, floorColor, ceilingColor) {
+function buildCorridor(scene, x, z, width, depth, floorColor, ceilingColor, accentColor = 0x334455) {
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(width, depth),
     new THREE.MeshBasicMaterial({ color: floorColor }),
   );
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set(x + width / 2, 0, z + depth / 2);
+  // Keep corridor surfaces slightly offset from the main level planes so the
+  // transition strips do not z-fight and flicker when they overlap the base map.
+  floor.position.set(x + width / 2, 0.03, z + depth / 2);
   scene.add(floor);
 
   const ceil = new THREE.Mesh(
@@ -173,8 +175,43 @@ function buildCorridor(scene, x, z, width, depth, floorColor, ceilingColor) {
     new THREE.MeshBasicMaterial({ color: ceilingColor }),
   );
   ceil.rotation.x = Math.PI / 2;
-  ceil.position.set(x + width / 2, WALL_H, z + depth / 2);
+  ceil.position.set(x + width / 2, WALL_H - 0.03, z + depth / 2);
   scene.add(ceil);
+
+  const stripMat = new THREE.MeshBasicMaterial({ color: accentColor });
+  const guideWidth = Math.max(0.18, Math.min(width, depth) * 0.06);
+  const depthRunsAlongZ = depth >= width;
+  const guideLength = depthRunsAlongZ ? depth - 0.2 : width - 0.2;
+  const guideGeo = new THREE.BoxGeometry(
+    depthRunsAlongZ ? guideWidth : guideLength,
+    0.04,
+    depthRunsAlongZ ? guideLength : guideWidth,
+  );
+
+  [-1, 1].forEach((side) => {
+    const guide = new THREE.Mesh(guideGeo, stripMat);
+    if (depthRunsAlongZ) {
+      guide.position.set(x + width / 2 + side * Math.max(0.35, width * 0.24), 0.05, z + depth / 2);
+    } else {
+      guide.position.set(x + width / 2, 0.05, z + depth / 2 + side * Math.max(0.35, depth * 0.24));
+    }
+    scene.add(guide);
+  });
+
+  const ribCount = Math.max(2, Math.floor((depthRunsAlongZ ? depth : width) / (TILE * 0.8)));
+  for (let index = 0; index < ribCount; index++) {
+    const t = (index + 1) / (ribCount + 1);
+    const rib = new THREE.Mesh(
+      new THREE.BoxGeometry(depthRunsAlongZ ? width - 0.25 : 0.08, 0.08, depthRunsAlongZ ? 0.08 : depth - 0.25),
+      new THREE.MeshBasicMaterial({ color: 0x11161d }),
+    );
+    if (depthRunsAlongZ) {
+      rib.position.set(x + width / 2, WALL_H - 0.12, z + depth * t);
+    } else {
+      rib.position.set(x + width * t, WALL_H - 0.12, z + depth / 2);
+    }
+    scene.add(rib);
+  }
 }
 
 function buildSign(scene, text, x, y, z, color = 0xff2200) {
@@ -195,6 +232,18 @@ function buildSign(scene, text, x, y, z, color = 0xff2200) {
   );
   sign.position.set(x, y, z);
   scene.add(sign);
+}
+
+function pulseScreenOverlay(steps) {
+  const overlay = document.getElementById('damage-overlay');
+  if (!overlay) return;
+
+  steps.forEach(({ delay, background = '', boxShadow = '' }) => {
+    setTimeout(() => {
+      overlay.style.background = background;
+      overlay.style.boxShadow = boxShadow;
+    }, delay);
+  });
 }
 
 // Solid cell list shared with main level
@@ -294,7 +343,7 @@ export class RansomwareKingArena {
     const corrW = 2 * TILE, corrH = 2 * TILE;
     const corrX = 27 * TILE, corrZ = 5 * TILE;
 
-    buildCorridor(this.scene, corrX, corrZ, corrW, corrH, 0x220008, 0x110005);
+    buildCorridor(this.scene, corrX, corrZ, corrW, corrH, 0x220008, 0x110005, 0x662233);
 
     // Danger sign at entrance
     buildSign(this.scene, 'RANSOMWARE CONTAINMENT ZONE — ENTER AT OWN RISK',
@@ -619,7 +668,7 @@ export class CascadeTitanArena {
       arenaCells.push({ ...c, minY: 0, maxY: WALL_H });
     });
 
-    buildCorridor(this.scene, 13 * TILE, 30 * TILE, 2 * TILE, 3 * TILE, 0x1d1206, 0x120a04);
+    buildCorridor(this.scene, 13 * TILE, 30 * TILE, 2 * TILE, 3 * TILE, 0x1d1206, 0x120a04, 0xaa6622);
 
     // Ambient — orange industrial
     this._ambientLight = new THREE.PointLight(0xff4400, 5, 80, 2);
@@ -789,11 +838,21 @@ export class CascadeTitanArena {
   _triggerArenaEvent(event) {
     if (event === 'lights_flicker' || event === 'lights_out') {
       this._lightsOut = event === 'lights_out';
-      document.body.style.filter = 'brightness(0.2)';
+      pulseScreenOverlay(
+        event === 'lights_out'
+          ? [
+              { delay: 0, background: 'rgba(0,0,0,0.62)' },
+              { delay: 2600, background: 'rgba(0,0,0,0.28)' },
+              { delay: 3000, background: '' },
+            ]
+          : [
+              { delay: 0, background: 'rgba(0,0,0,0.25)' },
+              { delay: 180, background: '' },
+            ],
+      );
       setTimeout(() => {
-        document.body.style.filter = '';
         this._lightsOut = false;
-      }, event === 'lights_out' ? 3000 : 300);
+      }, event === 'lights_out' ? 3000 : 220);
     } else if (event === 'electrify_floor') {
       this._startElectricPattern();
     } else if (event === 'alarm') {
@@ -997,7 +1056,7 @@ export class AuditArena {
       arenaCells.push({ ...c, minY: 0, maxY: WALL_H });
     });
 
-    buildCorridor(this.scene, 28 * TILE, 16 * TILE, TILE, 2 * TILE, 0x001724, 0x000d14);
+    buildCorridor(this.scene, 28 * TILE, 16 * TILE, TILE, 2 * TILE, 0x001724, 0x000d14, 0x2266aa);
 
     // Blue ambient
     const blueLight = new THREE.PointLight(0x0044ff, 4, 60, 2);
