@@ -1,45 +1,20 @@
-# DR DOOM — Disaster Recovery: The Game
+# DR DOOM
 
-A DOOM-inspired first-person shooter set in a failing data center. Fight through corrupted infrastructure, restore critical systems, and meet your RTO before all is lost.
+DR DOOM is a DOOM-inspired browser FPS set inside a failing data center. You play the DR Engineer, fight through corrupted infrastructure, clear boss arenas, and keep the recovery plan alive before the RTO expires.
 
 ## Play
 
-**[Play DR DOOM](https://eblackrps.github.io/dr-doom/)**
+- Live game: [https://eblackrps.github.io/dr-doom/](https://eblackrps.github.io/dr-doom/)
+- Article / embedded version: [https://www.anystackarchitect.com/playing-doom-in-a-data-center/](https://www.anystackarchitect.com/playing-doom-in-a-data-center/)
+- Platform: desktop browser with keyboard and mouse
 
-Requires a desktop browser with keyboard and mouse.
+## Highlights
 
-## Features
-
-- **7 weapons** modeled after real DR tools — Snapshot Pistol, Replication Shotgun, Failover Railgun, and more
-- **7 enemy types** themed around infrastructure failures — Corruption Crawlers, Ransomware Wraiths, Cascade Failure Titans
-- **3 boss fights** with unique arena mechanics
-- **6 interconnected rooms** — server floor, storage vault, network core, cold aisle, management console, emergency exit
-- **DR Runbook objective system** — restore VMs, verify backup chains, check environmental systems
-- **Encounter-directed progression** with staged room scripting and arsenal unlocks
-- **4 difficulty levels** — Intern, Sysadmin, Architect, Nightmare
-- **Persistent settings + saves** with localStorage persistence for controls, look tuning, audio mix, and checkpoints
-- **Ranked mission debriefs** with par times, best ranks, and commendations
-- **Procedural music** — combat, boss, and exploration layers driven by Web Audio API
-
-## Controls
-
-| Key | Action |
-|-----|--------|
-| WASD | Move |
-| Mouse | Look |
-| Left Click | Fire |
-| 1-7 | Switch weapon |
-| Scroll | Cycle weapon |
-| E | Interact |
-| Space | Jump |
-| ESC | Pause |
-
-## Tech Stack
-
-- **Three.js** — 3D rendering, raycasting, billboard sprites
-- **Web Audio API** — procedural music and SFX
-- **Vite** — build tooling
-- **Vanilla JS** — no framework dependencies
+- 7 weapons themed around real DR tooling, with the full arsenal available at spawn
+- 7 enemy types plus 3 boss fights: Ransomware King, Cascade Titan, and The Audit
+- Guided runbook objectives, minimap target pings, checkpoints, and ranked mission debriefs
+- Persistent controls, look tuning, audio settings, and boss checkpoint recovery
+- Procedural audio and music built with the Web Audio API
 
 ## Development
 
@@ -49,7 +24,7 @@ npm install
 npm run dev
 ```
 
-## Build
+## Build And Validation
 
 ```bash
 npm run build
@@ -57,12 +32,23 @@ npm run smoke
 npm run debug
 ```
 
-Output goes to `dist/`.
+- `npm run build` creates the production output in `dr-doom/dist/`
+- `npm run smoke` verifies the built bundles and release strings
+- `npm run debug` runs progression validation, build, and smoke checks together
 
-## Architecture
+More detailed project notes live in [dr-doom/README.md](dr-doom/README.md).
 
-Read more about the DR architecture concepts behind the game at [anystackarchitect.com](https://anystackarchitect.com).
+## Tech
+
+- Three.js
+- Vite
+- Vanilla ES modules
+- Web Audio API
+
+## Disclaimer
+
+DR DOOM is a fan-made homage. It is not affiliated with or endorsed by id Software, ZeniMax, Microsoft, Marvel, Veeam, VMware, or Broadcom. All third-party product names and trademarks belong to their respective owners.
 
 ## License
 
-MIT
+The code in this repository is licensed under the MIT License. See [LICENSE](LICENSE).
