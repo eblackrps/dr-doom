@@ -13,6 +13,15 @@ import {
 
 const BUILD_VERSION = '1.5.0';
 
+function isForwardedStart() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return window.self !== window.top || params.has('ref');
+  } catch {
+    return true;
+  }
+}
+
 function checkpointLabel(arenaId) {
   return {
     'ransomware-king': 'RANSOMWARE KING',
@@ -31,6 +40,9 @@ export class TitleScreen {
     this._resolve = null;
     this._ready = false;
     this._defaultSelection = saves.hasCheckpoint() ? 'resume' : 'new-run';
+    this._requireKeyboardStart = isForwardedStart();
+    this._embedHintEl = null;
+    this._embedHintTimer = null;
   }
 
   show() {
@@ -291,6 +303,7 @@ export class TitleScreen {
       const button = document.createElement('button');
       button.type = 'button';
       button.id = `menu-${id}`;
+      const isStartAction = id === 'resume' || id === 'new-run';
       button.style.cssText = `
         width: 100%;
         padding: 11px 12px;
@@ -314,10 +327,39 @@ export class TitleScreen {
       });
       if (id === 'settings') button.addEventListener('click', () => this._showSettingsFromTitle());
       else if (id === 'credits') button.addEventListener('click', () => this._showCredits());
-      else button.addEventListener('click', () => this._startGame(id));
+      else if (this._requireKeyboardStart && isStartAction) {
+        button.addEventListener('click', (event) => {
+          if (event.detail > 0) {
+            event.preventDefault();
+            this._flashEmbedHint();
+            return;
+          }
+          this._startGame(id);
+        });
+      } else button.addEventListener('click', () => this._startGame(id));
       menu.appendChild(button);
     });
     right.appendChild(menu);
+
+    if (this._requireKeyboardStart) {
+      const embedHint = document.createElement('div');
+      embedHint.style.cssText = `
+        margin-top: 14px;
+        padding: 10px 12px;
+        border: 1px solid #14301c;
+        background: rgba(0, 255, 65, 0.05);
+        font-size: 9px;
+        letter-spacing: 1px;
+        line-height: 1.8;
+        color: #89a989;
+      `;
+      embedHint.innerHTML = `
+        EMBED MODE ACTIVE.<br>
+        CLICK THE FRAME TO FOCUS, THEN PRESS ENTER TO DEPLOY.
+      `;
+      right.appendChild(embedHint);
+      this._embedHintEl = embedHint;
+    }
 
     const footer = document.createElement('div');
     footer.style.cssText = 'margin-top:16px;font-size:9px;letter-spacing:1px;line-height:1.8;color:#486248;';
@@ -345,6 +387,20 @@ export class TitleScreen {
 
     this._boundOnKey = this._onKey.bind(this);
     window.addEventListener('keydown', this._boundOnKey);
+  }
+
+  _flashEmbedHint() {
+    if (!this._embedHintEl) return;
+    this._embedHintEl.style.borderColor = '#00ff41';
+    this._embedHintEl.style.boxShadow = '0 0 20px #00ff4122';
+    this._embedHintEl.style.color = '#00ff41';
+    clearTimeout(this._embedHintTimer);
+    this._embedHintTimer = setTimeout(() => {
+      if (!this._embedHintEl) return;
+      this._embedHintEl.style.borderColor = '#14301c';
+      this._embedHintEl.style.boxShadow = 'none';
+      this._embedHintEl.style.color = '#89a989';
+    }, 900);
   }
 
   _onKey(e) {
