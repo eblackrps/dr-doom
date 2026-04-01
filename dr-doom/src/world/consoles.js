@@ -195,13 +195,13 @@ export const CONSOLE_DATA = {
 
   // Emergency Exit corridor — transition point
   'console-exit-gate': {
-    title: 'EMERGENCY EXIT — LEVEL TRANSITION',
-    subtitle: 'PROCEED TO STORAGE CATACOMBS',
+    title: 'EMERGENCY EXIT — LOCKDOWN OVERRIDE',
+    subtitle: 'AUTHORIZE CATACOMB BREACH / BOSS LOCKDOWN',
     lines: [
-      { label: 'LEVEL 1', value: 'VM FLOOR — COMPLETE', status: 'ok' },
-      { label: 'LEVEL 2', value: 'STORAGE CATACOMBS', status: 'warn' },
-      { label: 'THREAT LEVEL', value: 'ELEVATED', status: 'warn' },
-      { label: 'RTO REMAINING', value: '01:44:22', status: 'err' },
+      { label: 'LEVEL 1', value: 'RUNBOOK FLOOR — STABLE', status: 'ok' },
+      { label: 'QUARANTINE', value: 'STORAGE CATACOMBS — SEALED', status: 'warn' },
+      { label: 'LOCKDOWN', value: 'ENCRYPTION BOSS AHEAD', status: 'err' },
+      { label: 'TRANSFER', value: 'MANUAL AUTHORIZATION REQUIRED', status: 'warn' },
     ],
     tip: {
       heading: 'DR TIP // DOCUMENT EVERYTHING',

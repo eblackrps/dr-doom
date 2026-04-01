@@ -17,7 +17,7 @@ import { VictoryScreen }     from './ui/victory.js';
 import { TitleScreen }       from './ui/title-screen.js';
 import { PauseMenu }         from './ui/pause-menu.js';
 import { Minimap }           from './ui/minimap.js';
-import { RansomwareKingArena, CascadeTitanArena, AuditArena } from './world/boss-arenas.js';
+import { RansomwareKingArena, CascadeTitanArena, AuditArena, BOSS_ARENA_LAYOUTS } from './world/boss-arenas.js';
 import { boot }              from './ui/boot.js';
 import { audio }             from './audio/engine.js';
 import { AmbientAudio }      from './audio/ambient.js';
@@ -27,6 +27,70 @@ import { EnemySounds }       from './audio/enemies.js';
 import { saves }             from './save/save-system.js';
 import { loadGameplaySettings } from './settings/gameplay-settings.js';
 import { EncounterDirector } from './world/encounters.js';
+
+const RUNBOOK_DOOR_UNLOCKS = {
+  'console-spawn-overview': {
+    doorId: 'door-ab',
+    toast: 'VAULT ACCESS UNSEALED',
+  },
+  'console-storage-hardened': {
+    doorId: 'door-ac',
+    toast: 'NETWORK CORE ROUTE OPEN',
+  },
+  'console-network-core': {
+    doorId: 'door-cd',
+    toast: 'COLD AISLE CONTAINMENT RELEASED',
+  },
+  'console-cold-aisle': {
+    doorId: 'door-be',
+    toast: 'MANAGEMENT ACCESS AUTHORIZED',
+  },
+  'console-architect-kb': {
+    doorId: 'door-df',
+    toast: 'EMERGENCY EXIT UNSEALED',
+  },
+};
+
+const BOSS_LOADOUTS = {
+  'ransomware-king': {
+    health: 80,
+    armor: 55,
+    unlockSlots: [2, 4, 5],
+    ammo: {
+      REPLICA_CHARGES: 18,
+      FAILOVER_TOKENS: 5,
+      IMMUTABLE_LOCKS: 5,
+    },
+    toast: 'BOSS LOADOUT SYNC // DECRYPTION PACKAGE READY',
+  },
+  'cascade-titan': {
+    health: 95,
+    armor: 75,
+    unlockSlots: [2, 3, 4, 5, 6],
+    ammo: {
+      REPLICA_CHARGES: 20,
+      BACKUP_CAPACITY: 160,
+      FAILOVER_TOKENS: 8,
+      IMMUTABLE_LOCKS: 8,
+      CDP_POINTS: 180,
+    },
+    toast: 'BOSS LOADOUT SYNC // CASCADE RESPONSE KIT READY',
+  },
+  'the-audit': {
+    health: 100,
+    armor: 85,
+    unlockSlots: [2, 3, 4, 5, 6, 7],
+    ammo: {
+      REPLICA_CHARGES: 24,
+      BACKUP_CAPACITY: 180,
+      FAILOVER_TOKENS: 10,
+      IMMUTABLE_LOCKS: 9,
+      CDP_POINTS: 220,
+      BFR_CELLS: 1,
+    },
+    toast: 'BOSS LOADOUT SYNC // CERTIFICATION PACKAGE READY',
+  },
+};
 
 // Touch device gate — must run before anything else.
 // Pointer lock + keyboard + mouse are required; touch-only devices cannot play.
@@ -187,6 +251,8 @@ function launchGame(startMode = 'resume') {
     if (checkpointPos) {
       player.position.set(checkpointPos.x, checkpointPos.y, checkpointPos.z);
     }
+    unlockAllProgressionDoors({ silent: true });
+    applyBossLoadout(checkpoint.arenaId, { silent: true });
     _showCheckpointToast(checkpoint.arenaId);
   }
 
@@ -210,7 +276,13 @@ function launchGame(startMode = 'resume') {
   pauseMenu.hide = () => { origHide(); audio.applySettings(); };
 
   consoleUI.setOnOpen(id => {
-    objectives.notifyConsoleAccessed(id);
+    const isEarlyExitGate = id === 'console-exit-gate' && !objectives.isObjectiveActive('obj-exit');
+    if (!isEarlyExitGate) {
+      objectives.notifyConsoleAccessed(id);
+    } else {
+      _showSystemToast('EXIT GATE STANDBY // CLEAR THE FINAL SWEEP FIRST', '#ffaa00');
+    }
+    unlockDoorFromConsole(id);
     encounters.handleConsoleAccessed(id);
     EnemySounds.consoleAccess();
   });
@@ -279,11 +351,70 @@ function launchGame(startMode = 'resume') {
   const saveCheckpoint = (arenaId) =>
     saves.saveCheckpoint(arenaId, player, weapons, _getCheckpointSpawn(arenaId));
 
+  const unlockAllProgressionDoors = (options = {}) => {
+    Object.values(RUNBOOK_DOOR_UNLOCKS).forEach(({ doorId }) => {
+      level.unlockDoor(doorId, { silent: options.silent ?? true });
+    });
+  };
+
+  const unlockDoorFromConsole = (consoleId) => {
+    const unlock = RUNBOOK_DOOR_UNLOCKS[consoleId];
+    if (!unlock) return;
+    const changed = level.unlockDoor(unlock.doorId, { silent: true });
+    if (changed) {
+      _showSystemToast(`RUNBOOK UPDATE // ${unlock.toast}`, '#00ff41');
+    }
+  };
+
+  const applyBossLoadout = (arenaId, options = {}) => {
+    const loadout = BOSS_LOADOUTS[arenaId];
+    if (!loadout) return;
+
+    player.health = Math.max(player.health, loadout.health);
+    player.armor = Math.max(player.armor, loadout.armor);
+    loadout.unlockSlots.forEach(slot => weapons.unlockSlot(slot));
+    Object.entries(loadout.ammo).forEach(([ammoType, amount]) => {
+      weapons.ammo.set(ammoType, Math.max(weapons.ammo.get(ammoType), amount));
+    });
+
+    if (!options.silent) {
+      EnemySounds.pickupAmmo();
+      _showSystemToast(loadout.toast, '#ffaa00');
+    }
+  };
+
+  const getNavigationTarget = () => {
+    if (auditArena._active && !auditArena._complete) {
+      const pos = auditArena.getNavigationTarget();
+      return pos ? { position: pos, label: 'THE AUDIT' } : null;
+    }
+    if (ctArena._active && !ctArena._bossDefeated) {
+      const pos = ctArena.getNavigationTarget();
+      return pos ? { position: pos, label: ctArena.boss?.name ?? 'CASCADE FAILURE TITAN' } : null;
+    }
+    if (rkArena._active && !rkArena._bossDefeated) {
+      const pos = rkArena.getNavigationTarget();
+      return pos ? { position: pos, label: rkArena.boss?.name ?? 'RANSOMWARE KING' } : null;
+    }
+
+    const target = objectives.getNavigationTarget();
+    if (!target) return null;
+    if (target.consoleId) {
+      const pos = level.getConsolePosition(target.consoleId);
+      return pos ? { position: pos, label: target.label } : null;
+    }
+    if (target.position) {
+      return { position: target.position, label: target.label };
+    }
+    return null;
+  };
+
   // Boss sequence
   rkArena.onDefeat(() => {
     bossHUD.hide(); hud.faceCam?.notifyBossExit();
     music.setState('explore'); ambient.triggerAlarm(1.5);
     enemies.suppressWaves();
+    applyBossLoadout('cascade-titan');
     ctArena.activate();
     saveCheckpoint('cascade-titan');
     bossHUD.show(ctArena.boss.name);
@@ -295,6 +426,7 @@ function launchGame(startMode = 'resume') {
     bossHUD.hide(); hud.faceCam?.notifyBossExit();
     music.setState('explore'); ambient.triggerAlarm(1.5);
     enemies.suppressWaves();
+    applyBossLoadout('the-audit');
     auditArena.activate();
     saveCheckpoint('the-audit');
     bossHUD.show('THE AUDIT');
@@ -338,8 +470,10 @@ function launchGame(startMode = 'resume') {
     );
   });
 
-  objectives.onLevelComplete(() => {
+  objectives.onExitReached(() => {
     enemies.suppressWaves();
+    unlockAllProgressionDoors({ silent: true });
+    applyBossLoadout('ransomware-king');
     rkArena.activate();
     saveCheckpoint('ransomware-king');
     bossHUD.show(rkArena.boss.name);
@@ -352,14 +486,18 @@ function launchGame(startMode = 'resume') {
     objectives.restoreBossCheckpoint();
     enemies.suppressWaves();
     levelDone = true;
+    unlockAllProgressionDoors({ silent: true });
 
     if (arenaId === 'ransomware-king') {
       rkArena.activate();
       bossHUD.show(rkArena.boss.name);
     } else if (arenaId === 'cascade-titan') {
+      rkArena.resolveCheckpointDefeat?.();
       ctArena.activate();
       bossHUD.show(ctArena.boss.name);
     } else if (arenaId === 'the-audit') {
+      rkArena.resolveCheckpointDefeat?.();
+      ctArena.resolveCheckpointDefeat?.();
       auditArena.activate();
       bossHUD.show('THE AUDIT');
     }
@@ -482,8 +620,8 @@ function launchGame(startMode = 'resume') {
       ...weapons.getStatusState(),
       bossVulnerable: activeBoss?.isVulnerable?.() ?? false,
     });
-    objHUD.update(objectives.getObjectives());
-    minimap.update(player.getPosition(), player.yaw, enemies.getAllEnemyEntities());
+    objHUD.update(objectives.getObjectives(), objectives.getPrimaryObjective());
+    minimap.update(player.getPosition(), player.yaw, enemies.getAllEnemyEntities(), getNavigationTarget());
 
     if (hudTitle) {
       const count = enemies.getEnemyCount();
@@ -578,14 +716,5 @@ function _showCheckpointToast(arenaId) {
 }
 
 function _getCheckpointSpawn(arenaId) {
-  switch (arenaId) {
-    case 'ransomware-king':
-      return { x: 112, y: 1.65, z: 22 };
-    case 'cascade-titan':
-      return { x: 68, y: 1.65, z: 136 };
-    case 'the-audit':
-      return { x: 124, y: 1.65, z: 88 };
-    default:
-      return null;
-  }
+  return BOSS_ARENA_LAYOUTS[arenaId]?.checkpoint ?? null;
 }

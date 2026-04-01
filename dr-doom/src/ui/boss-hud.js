@@ -51,6 +51,12 @@ export class BossHUD {
         color: #ff440066;
         margin-top: 4px;
       ">PHASE 1</div>
+      <div id="boss-hint" style="
+        margin-top: 6px;
+        font-size: 8px;
+        letter-spacing: 1px;
+        color: #778877;
+      "></div>
     `;
 
     document.body.appendChild(el);
@@ -58,6 +64,7 @@ export class BossHUD {
     this._bar   = document.getElementById('boss-health-bar');
     this._name  = document.getElementById('boss-name');
     this._phase = document.getElementById('boss-phase');
+    this._hint  = document.getElementById('boss-hint');
   }
 
   show(name) {
@@ -96,5 +103,15 @@ export class BossHUD {
       this._name.style.animation = '';
       this._name.style.color = '#ff2200';
     }
+
+    const hint =
+      boss.type === 'ransomware_king'
+        ? (boss.isVulnerable?.() ? 'Core exposed. Dump damage before the shield returns.' : 'Shoot all three decryption nodes to open the damage window.')
+        : boss.type === 'cascade_titan_full'
+          ? (boss._isCharging ? 'Charge lane live. Break laterally before impact.' : boss.phase >= 3 ? 'Watch the floor lanes. Electrified strips will punish static play.' : 'Bait the charge and punish the recovery.')
+          : boss.type === 'the_audit'
+            ? 'Follow the highlighted task beacon and clear each console before the RTO expires.'
+            : '';
+    this._hint.textContent = hint;
   }
 }

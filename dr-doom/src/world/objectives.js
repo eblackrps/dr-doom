@@ -31,7 +31,7 @@ export const LEVEL1_OBJECTIVES = [
     detail: 'Access Backup Chain Status in the Storage Vault',
     type: OBJ_TYPE.ACTIVATE_CONSOLE,
     consoleId: 'console-storage-vault',
-    prereqs: [],
+    prereqs: ['obj-restore-vms'],
   },
   {
     id: 'obj-check-hardened',
@@ -39,7 +39,7 @@ export const LEVEL1_OBJECTIVES = [
     detail: 'Verify immutable backup target configuration',
     type: OBJ_TYPE.ACTIVATE_CONSOLE,
     consoleId: 'console-storage-hardened',
-    prereqs: ['obj-verify-backups'],
+    prereqs: ['obj-restore-vms'],
   },
   {
     id: 'obj-restore-network',
@@ -47,7 +47,7 @@ export const LEVEL1_OBJECTIVES = [
     detail: 'Access Network Topology console in the Network Core',
     type: OBJ_TYPE.ACTIVATE_CONSOLE,
     consoleId: 'console-network-core',
-    prereqs: ['obj-restore-vms'],
+    prereqs: ['obj-check-hardened'],
   },
   {
     id: 'obj-check-env',
@@ -55,7 +55,7 @@ export const LEVEL1_OBJECTIVES = [
     detail: 'Review Cold Aisle environmental monitoring',
     type: OBJ_TYPE.ACTIVATE_CONSOLE,
     consoleId: 'console-cold-aisle',
-    prereqs: [],
+    prereqs: ['obj-restore-network'],
   },
   {
     id: 'obj-architect-kb',
@@ -63,13 +63,14 @@ export const LEVEL1_OBJECTIVES = [
     detail: 'Authenticate with AnyStack Architect knowledge base',
     type: OBJ_TYPE.ACTIVATE_CONSOLE,
     consoleId: 'console-architect-kb',
-    prereqs: [],
+    prereqs: ['obj-check-env'],
   },
   {
     id: 'obj-clear-threats',
     label: 'COMPLETE FINAL CONTAINMENT SWEEP',
-    detail: 'After restoring the floor, clear every remaining hostile between the vault and the exit corridor',
+    detail: 'Clear the Emergency Exit corridor before you authorize the catacomb breach',
     type: OBJ_TYPE.KILL_ALL_IN_ROOM,
+    navPoint: { x: 13.5 * 4, z: 26.5 * 4 },
     prereqs: [
       'obj-restore-vms',
       'obj-verify-backups',
@@ -81,11 +82,12 @@ export const LEVEL1_OBJECTIVES = [
   },
   {
     id: 'obj-exit',
-    label: 'PROCEED TO STORAGE CATACOMBS',
-    detail: 'Reach the Emergency Exit corridor',
-    type: OBJ_TYPE.REACH_ZONE,
-    zone: { minX: 9*4, maxX: 18*4, minZ: 23*4, maxZ: 30*4 },
-    prereqs: ['obj-restore-vms', 'obj-verify-backups', 'obj-restore-network', 'obj-clear-threats'],
+    label: 'AUTHORIZE CATACOMB DESCENT',
+    detail: 'Access the Emergency Exit transfer console to trigger the first boss lockdown',
+    type: OBJ_TYPE.ACTIVATE_CONSOLE,
+    consoleId: 'console-exit-gate',
+    requiresActiveAccess: true,
+    prereqs: ['obj-clear-threats'],
   },
 ];
 
@@ -94,6 +96,8 @@ export class ObjectiveSystem {
     this._objectives = LEVEL1_OBJECTIVES.map(def => ({
       ...def,
       status: def.prereqs.length === 0 ? OBJ_STATUS.ACTIVE : OBJ_STATUS.LOCKED,
+      runtimeDetail: '',
+      _accessedWhileActive: false,
     }));
 
     this._completedConsoles = new Set();
@@ -108,6 +112,8 @@ export class ObjectiveSystem {
   restoreBossCheckpoint() {
     this._objectives.forEach(obj => {
       obj.status = OBJ_STATUS.COMPLETE;
+      obj.runtimeDetail = '';
+      obj._accessedWhileActive = true;
     });
     this.levelComplete = true;
   }
@@ -115,6 +121,11 @@ export class ObjectiveSystem {
   // Called when player accesses a console
   notifyConsoleAccessed(consoleId) {
     this._completedConsoles.add(consoleId);
+    this._objectives.forEach(obj => {
+      if (obj.type === OBJ_TYPE.ACTIVATE_CONSOLE && obj.consoleId === consoleId && obj.status === OBJ_STATUS.ACTIVE) {
+        obj._accessedWhileActive = true;
+      }
+    });
   }
 
   update(playerPos, enemies) {
@@ -128,7 +139,10 @@ export class ObjectiveSystem {
         const allMet = obj.prereqs.every(pid =>
           this._objectives.find(o => o.id === pid)?.status === OBJ_STATUS.COMPLETE
         );
-        if (allMet) obj.status = OBJ_STATUS.ACTIVE;
+        if (allMet) {
+          obj.status = OBJ_STATUS.ACTIVE;
+          obj.runtimeDetail = obj.detail;
+        }
         else continue;
       }
 
@@ -165,13 +179,23 @@ export class ObjectiveSystem {
   _evaluate(obj, playerPos, enemies) {
     switch (obj.type) {
       case OBJ_TYPE.ACTIVATE_CONSOLE:
+        obj.runtimeDetail = obj.detail;
+        if (obj.requiresActiveAccess) {
+          return obj._accessedWhileActive;
+        }
         return this._completedConsoles.has(obj.consoleId);
 
-      case OBJ_TYPE.KILL_ALL_IN_ROOM:
-        return enemies.filter(e => !e.isDead).length === 0;
+      case OBJ_TYPE.KILL_ALL_IN_ROOM: {
+        const remaining = enemies.filter(e => !e.isDead).length;
+        obj.runtimeDetail = remaining > 0
+          ? `${obj.detail} // ${remaining} HOSTILES REMAINING`
+          : `${obj.detail} // CORRIDOR SECURE`;
+        return remaining === 0;
+      }
 
       case OBJ_TYPE.REACH_ZONE: {
         const z = obj.zone;
+        obj.runtimeDetail = obj.detail;
         return playerPos.x >= z.minX && playerPos.x <= z.maxX &&
                playerPos.z >= z.minZ && playerPos.z <= z.maxZ;
       }
@@ -226,5 +250,36 @@ export class ObjectiveSystem {
     const total = this._objectives.length;
     const done  = this._objectives.filter(o => o.status === OBJ_STATUS.COMPLETE).length;
     return done / total;
+  }
+
+  isObjectiveActive(id) {
+    return this._objectives.find(obj => obj.id === id)?.status === OBJ_STATUS.ACTIVE;
+  }
+
+  getPrimaryObjective() {
+    const active = this._objectives.find(obj => obj.status === OBJ_STATUS.ACTIVE);
+    if (active) return active;
+    return this._objectives.find(obj => obj.status !== OBJ_STATUS.COMPLETE) ?? null;
+  }
+
+  getNavigationTarget() {
+    const active = this.getPrimaryObjective();
+    if (!active) return null;
+    if (active.consoleId) {
+      return { consoleId: active.consoleId, label: active.label };
+    }
+    if (active.navPoint) {
+      return { position: { ...active.navPoint }, label: active.label };
+    }
+    if (active.zone) {
+      return {
+        position: {
+          x: (active.zone.minX + active.zone.maxX) / 2,
+          z: (active.zone.minZ + active.zone.maxZ) / 2,
+        },
+        label: active.label,
+      };
+    }
+    return null;
   }
 }

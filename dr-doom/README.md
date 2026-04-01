@@ -1,5 +1,5 @@
 # DR DOOM — Disaster Recovery: The Game
-### v1.3.0 — Encounter Director Update
+### v1.4.0 — Progression Integrity Update
 
 > "RTO is ticking, Engineer. Pick up the Replication Shotgun and get to work."
 
@@ -10,9 +10,10 @@
 ```bash
 npm install
 npm run dev       # development server at localhost:3000
+npm run validate:progression  # structural progression + boss-win validation
 npm run build     # production build to /dist
 npm run smoke     # verify the built bundles + synced release strings
-npm run debug     # build + smoke in one pass
+npm run debug     # progression validation + build + smoke
 npm run preview   # preview production build
 ```
 
@@ -37,11 +38,15 @@ A DOOM-inspired first-person shooter set in a failing data center. You are the D
 
 **4 Difficulty Levels** — Intern / Sysadmin / Architect / Nightmare On-Call
 
+**Progression integrity pass** — boss arenas now open through real map geometry, guided runbook routing, and checkpoint-safe world state
+
 **Encounter-directed progression** — weapons unlock through recovery milestones instead of starting with the full arsenal
 
 **Persistent operator settings** — remappable controls, look sensitivity, FOV, invert Y, and audio mix all save locally
 
 **Ranked debriefs** — every clear is graded with par-time and commendation tracking
+
+**Boss navigation + fail-safes** — minimap objective markers, boss-specific HUD tips, highlighted Audit consoles, and recovery loadout syncs keep every boss reachable and killable
 
 **4 Secret Rooms** — real DR architecture notes, Veeam guides, VCF runbook, BFR vault
 

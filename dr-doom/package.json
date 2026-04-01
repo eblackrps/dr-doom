@@ -1,14 +1,15 @@
 {
   "name": "dr-doom",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "DR DOOM: Disaster Recovery — The Game",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "validate:progression": "node ./scripts/validate-progression.mjs",
     "smoke": "node ./scripts/smoke-build.mjs",
-    "debug": "npm run build && npm run smoke"
+    "debug": "npm run validate:progression && npm run build && npm run smoke"
   },
   "dependencies": {
     "three": "^0.169.0"

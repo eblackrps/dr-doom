@@ -38,8 +38,18 @@ export class InteractionSystem {
     return el;
   }
 
-  register(mesh, type, id, onInteract) {
-    this._interactables.push({ mesh, type, id, onInteract });
+  register(mesh, type, id, onInteract, options = {}) {
+    this._interactables.push({
+      mesh,
+      type,
+      id,
+      onInteract,
+      canInteract: options.canInteract ?? null,
+      onBlocked: options.onBlocked ?? null,
+      getPrompt: options.getPrompt ?? null,
+      getPromptColor: options.getPromptColor ?? null,
+      getPromptBorderColor: options.getPromptBorderColor ?? null,
+    });
   }
 
   update(dt, input) {
@@ -66,13 +76,23 @@ export class InteractionSystem {
 
       if (item) {
         this._lastHit = item;
-        const label = item.type === 'door' ? '[E] OPEN' : '[E] ACCESS TERMINAL';
+        const label = item.getPrompt?.(item) ?? (
+          item.type === 'door' ? '[E] OPEN' : '[E] ACCESS TERMINAL'
+        );
+        const promptColor = item.getPromptColor?.(item) ?? '#00ff41';
+        const promptBorderColor = item.getPromptBorderColor?.(item) ?? promptColor;
         this._promptEl.textContent = label;
+        this._promptEl.style.color = promptColor;
+        this._promptEl.style.borderColor = promptBorderColor;
         this._promptEl.style.display = 'block';
 
         if (input.isActionActive('interact') && this._cooldown <= 0) {
           this._cooldown = INTERACT_COOLDOWN;
-          item.onInteract();
+          if (item.canInteract && !item.canInteract(item)) {
+            item.onBlocked?.(item);
+          } else {
+            item.onInteract();
+          }
         }
         return;
       }

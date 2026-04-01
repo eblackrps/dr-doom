@@ -32,6 +32,15 @@ export class ObjectiveHUD {
     header.textContent = 'DR RUNBOOK // OBJECTIVES';
     el.appendChild(header);
 
+    this._focus = document.createElement('div');
+    this._focus.style.cssText = `
+      margin-bottom: 8px;
+      padding: 8px 9px;
+      border: 1px solid #223322;
+      background: rgba(0, 0, 0, 0.45);
+    `;
+    el.appendChild(this._focus);
+
     this._list = document.createElement('div');
     this._list.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
     el.appendChild(this._list);
@@ -58,15 +67,31 @@ export class ObjectiveHUD {
     return el;
   }
 
-  update(objectives) {
+  update(objectives, primaryObjective = null) {
     // Build state key to avoid unnecessary DOM updates
-    const stateKey = objectives.map(o => o.status + o.id).join('');
+    const focusKey = primaryObjective
+      ? `${primaryObjective.id}:${primaryObjective.status}:${primaryObjective.runtimeDetail ?? primaryObjective.detail ?? ''}`
+      : 'none';
+    const stateKey = objectives.map(o => o.status + o.id).join('') + focusKey;
     if (stateKey === this._lastState) return;
     this._lastState = stateKey;
 
     this._list.innerHTML = '';
+    this._focus.innerHTML = primaryObjective ? `
+      <div style="font-size:8px;letter-spacing:2px;color:#557755;margin-bottom:4px;">ACTIVE DIRECTIVE</div>
+      <div style="font-size:10px;letter-spacing:2px;color:#ffaa00;text-shadow:0 0 8px #ffaa0055;">
+        ${primaryObjective.label}
+      </div>
+      <div style="margin-top:6px;font-size:8px;line-height:1.7;letter-spacing:1px;color:#88aa88;">
+        ${primaryObjective.runtimeDetail || primaryObjective.detail || 'Runbook synchronized.'}
+      </div>
+    ` : `
+      <div style="font-size:8px;letter-spacing:2px;color:#557755;">ACTIVE DIRECTIVE</div>
+      <div style="margin-top:6px;font-size:9px;letter-spacing:2px;color:#00ff41;">RUNBOOK COMPLETE</div>
+    `;
 
     objectives.forEach(obj => {
+      const isActive = primaryObjective?.id === obj.id;
       const row = document.createElement('div');
       row.style.cssText = `
         display: flex;
@@ -76,6 +101,9 @@ export class ObjectiveHUD {
         letter-spacing: 1px;
         line-height: 1.4;
         opacity: ${obj.status === OBJ_STATUS.LOCKED ? '0.3' : '1'};
+        padding: ${isActive ? '3px 5px' : '0'};
+        border: ${isActive ? '1px solid #ffaa0033' : '1px solid transparent'};
+        background: ${isActive ? 'rgba(255, 170, 0, 0.06)' : 'transparent'};
       `;
 
       const icon = document.createElement('span');

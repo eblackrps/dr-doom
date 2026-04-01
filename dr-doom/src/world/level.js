@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-const TILE   = 4;
+export const TILE   = 4;
 const WALL_H = 4;
 const STEP_HEIGHT = 0.4;
 
@@ -15,14 +15,14 @@ const STEP_HEIGHT = 0.4;
   F = Emergency Exit Corridor    rows 23-30, cols 9-18
 */
 
-const LEVEL_MAP = [
+export const LEVEL_MAP = [
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], // 0
   [1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 1
   [1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 2
   [1,0,0,1,1,0,0,0,0,1,1,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,1], // 3
   [1,0,0,1,0,0,0,0,0,0,1,0,1,1,0,0,1,0,0,0,0,1,0,0,1,0,0,1], // 4
-  [1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 5
-  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 6 door row A-B
+  [1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0], // 5 boss corridor east
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], // 6 door row A-B + boss corridor east
   [1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 7
   [1,0,0,1,1,0,0,0,0,1,1,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,1], // 8
   [1,0,0,1,0,0,0,0,0,0,1,0,1,1,0,0,1,0,0,0,0,1,0,0,1,0,0,1], // 9
@@ -32,8 +32,8 @@ const LEVEL_MAP = [
   [1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1], // 13
   [1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1], // 14
   [1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1], // 15
-  [1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 16 C-D door col 12
-  [1,0,0,1,0,0,0,0,1,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1], // 17
+  [1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], // 16 C-D door col 12 + audit corridor east
+  [1,0,0,1,0,0,0,0,1,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], // 17 audit corridor east
   [1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1], // 18
   [1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1], // 19
   [1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1], // 20
@@ -46,14 +46,14 @@ const LEVEL_MAP = [
   [1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1], // 27
   [1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1], // 28
   [1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1], // 29
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], // 30
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], // 31
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1], // 30 titan corridor south
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1], // 31 titan corridor south
 ];
 
-const ROWS = LEVEL_MAP.length;
-const COLS = LEVEL_MAP[0].length;
+export const ROWS = LEVEL_MAP.length;
+export const COLS = LEVEL_MAP[0].length;
 
-const DOOR_DEFS = [
+export const DOOR_DEFS = [
   { col: 12, row: 6,  axis: 'x', id: 'door-ab',  label: 'VAULT ACCESS' },
   { col: 6,  row: 11, axis: 'z', id: 'door-ac',  label: 'LOWER LEVEL',   linkedId: 'door-ac2' },
   { col: 7,  row: 12, axis: 'z', id: 'door-ac2', label: 'LOWER LEVEL',   linkedId: 'door-ac'  },
@@ -64,7 +64,7 @@ const DOOR_DEFS = [
   { col: 12, row: 16, axis: 'x', id: 'door-cd',  label: 'COLD AISLE' },
 ];
 
-const CONSOLE_DEFS = [
+export const CONSOLE_DEFS = [
   { col: 6,  row: 2,  id: 'console-spawn-overview',  facing: 's' },
   { col: 18, row: 2,  id: 'console-storage-vault',    facing: 's' },
   { col: 24, row: 5,  id: 'console-storage-hardened', facing: 'w' },
@@ -80,9 +80,12 @@ export class Level {
     this.interaction = interactionSystem;
     this._solidCells = [];
     this._doors = [];
+    this._doorLookup = new Map();
+    this._consoleLookup = new Map();
 
     this._buildGeometry();
     this._buildDoors();
+    this._initDoorLocks();
     this._addLighting();
     this._addServerRacks();
     this._addConsoles();
@@ -173,13 +176,44 @@ export class Level {
       };
       this._solidCells.push(collCell);
 
-      const ds = { mesh, def, open: false, opening: false, closing: false, t: 0, collCell, openTimer: 0 };
+      const ds = {
+        mesh,
+        def,
+        strip,
+        open: false,
+        opening: false,
+        closing: false,
+        t: 0,
+        collCell,
+        openTimer: 0,
+        locked: false,
+        lockReason: '',
+      };
       this._doors.push(ds);
+      this._doorLookup.set(def.id, ds);
 
       if (this.interaction) {
-        this.interaction.register(mesh, 'door', def.id, () => this._toggleDoor(ds));
+        this.interaction.register(mesh, 'door', def.id, () => this._toggleDoor(ds), {
+          canInteract: () => !ds.locked,
+          onBlocked: () => this._showDoorToast(ds.lockReason || `${def.label} LOCKED`, '#ff8800'),
+          getPrompt: () => (
+            ds.locked
+              ? `[E] LOCKED // ${ds.lockReason || def.label}`
+              : `[E] OPEN // ${def.label}`
+          ),
+          getPromptColor: () => (ds.locked ? '#ff8800' : '#00ff41'),
+          getPromptBorderColor: () => (ds.locked ? '#ff8800' : '#00ff41'),
+        });
       }
     });
+  }
+
+  _initDoorLocks() {
+    this.lockDoor('door-ab', 'RUN MAIN SERVER CONSOLE', { silent: true });
+    this.lockDoor('door-ac', 'VALIDATE HARDENED REPO', { silent: true });
+    this.lockDoor('door-be', 'STABILIZE COLD AISLE', { silent: true });
+    this.lockDoor('door-cd', 'RESTORE NETWORK SPINE', { silent: true });
+    this.lockDoor('door-df', 'COMPLETE MANAGEMENT SYNC', { silent: true });
   }
 
   _toggleDoor(ds) {
@@ -197,6 +231,51 @@ export class Level {
         else          { partner.closing = true; partner.opening = false; }
       }
     }
+  }
+
+  setDoorLocked(id, locked, reason = '', options = {}) {
+    const ds = this._doorLookup.get(id);
+    if (!ds) return false;
+
+    const changed = ds.locked !== locked || ds.lockReason !== reason;
+    ds.locked = locked;
+    ds.lockReason = locked ? reason : '';
+
+    if (locked) {
+      ds.open = false;
+      ds.opening = false;
+      ds.closing = true;
+      ds.openTimer = 0;
+    }
+
+    this._syncDoorVisual(ds);
+
+    if (!options.fromLinked && ds.def.linkedId) {
+      this.setDoorLocked(ds.def.linkedId, locked, reason, {
+        ...options,
+        fromLinked: true,
+      });
+    }
+
+    if (changed && !options.silent) {
+      const status = locked ? 'SEALED' : 'UNLOCKED';
+      const color = locked ? '#ff8800' : '#00ff41';
+      this._showDoorToast(`${ds.def.label} ${status}`, color);
+    }
+    return changed;
+  }
+
+  unlockDoor(id, options = {}) {
+    return this.setDoorLocked(id, false, '', options);
+  }
+
+  lockDoor(id, reason, options = {}) {
+    return this.setDoorLocked(id, true, reason, options);
+  }
+
+  _syncDoorVisual(ds) {
+    ds.mesh.material.color.setHex(ds.locked ? 0x3a2112 : 0x2a3d2a);
+    ds.strip.material.color.setHex(ds.locked ? 0xff8800 : 0x00ff41);
   }
 
   updateDoors(dt) {
@@ -402,6 +481,7 @@ export class Level {
       g.position.set(def.col*TILE+TILE/2, 0, def.row*TILE+TILE/2);
       g.rotation.y = facingAngles[def.facing] || 0;
       this.scene.add(g);
+      this._consoleLookup.set(def.id, new THREE.Vector3(g.position.x, 0.01, g.position.z));
 
       this.interaction.register(g, 'console', def.id, () => {
         this.interaction.consoleUI.open(def.id);
@@ -755,6 +835,26 @@ export class Level {
       }
     }
     return true;
+  }
+
+  getConsolePosition(consoleId) {
+    const pos = this._consoleLookup.get(consoleId);
+    return pos ? pos.clone() : null;
+  }
+
+  _showDoorToast(text, color = '#ffaa00') {
+    const el = document.createElement('div');
+    el.style.cssText = `
+      position:fixed; top:36%; left:50%; transform:translateX(-50%);
+      padding:8px 12px; border:1px solid ${color}33;
+      background:rgba(0,0,0,0.82); font-family:'Courier New',monospace;
+      font-size:10px; letter-spacing:2px; color:${color};
+      text-shadow:0 0 10px ${color}; pointer-events:none;
+      white-space:nowrap; z-index:140; animation:objToast 2.6s forwards;
+    `;
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
   }
 
   update(dt) {

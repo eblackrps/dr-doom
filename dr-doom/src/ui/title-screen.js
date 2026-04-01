@@ -11,7 +11,7 @@ import {
   resetAudioSettings,
 } from '../settings/audio-settings.js';
 
-const BUILD_VERSION = '1.3.0';
+const BUILD_VERSION = '1.4.0';
 
 function checkpointLabel(arenaId) {
   return {

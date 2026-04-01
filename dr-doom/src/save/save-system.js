@@ -3,7 +3,7 @@
 // Persists: difficulty, level completion, best times, kill counts, secrets found
 
 const SAVE_KEY = 'dr-doom-save';
-const VERSION  = '1.3.0';
+const VERSION  = '1.4.0';
 
 const DEFAULTS = {
   version:      VERSION,

@@ -7,9 +7,71 @@ import { EnemySounds } from '../audio/enemies.js';
 const TILE   = 4;
 const WALL_H = 4;
 
+export const WORLD_COLS = 43;
+export const WORLD_ROWS = 47;
+
+export const BOSS_ARENA_LAYOUTS = {
+  'ransomware-king': {
+    room: { minCol: 29, maxCol: 42, minRow: 0, maxRow: 11 },
+    corridor: { minCol: 27, maxCol: 28, minRow: 5, maxRow: 6 },
+    entrance: {
+      side: 'west',
+      start: 5 * TILE,
+      end: 7 * TILE,
+    },
+    checkpoint: { x: 112, y: 1.65, z: 24 },
+    bossCell: { col: 36, row: 4 },
+  },
+  'cascade-titan': {
+    room: { minCol: 0, maxCol: 27, minRow: 33, maxRow: 46 },
+    corridor: { minCol: 13, maxCol: 14, minRow: 30, maxRow: 32 },
+    entrance: {
+      side: 'north',
+      start: 13 * TILE,
+      end: 15 * TILE,
+    },
+    checkpoint: { x: 56, y: 1.65, z: 136 },
+    bossCell: { col: 14, row: 38 },
+  },
+  'the-audit': {
+    room: { minCol: 29, maxCol: 42, minRow: 14, maxRow: 29 },
+    corridor: { minCol: 28, maxCol: 28, minRow: 16, maxRow: 17 },
+    entrance: {
+      side: 'west',
+      start: 8,
+      end: 16,
+    },
+    checkpoint: { x: 124, y: 1.65, z: 88 },
+    bossCell: { col: 36, row: 18 },
+  },
+};
+
+function buildSegments(totalLength, openings = []) {
+  const normalized = [...openings]
+    .map(opening => ({
+      start: Math.max(0, Math.min(totalLength, opening.start ?? 0)),
+      end: Math.max(0, Math.min(totalLength, opening.end ?? 0)),
+    }))
+    .filter(opening => opening.end > opening.start)
+    .sort((a, b) => a.start - b.start);
+
+  const segments = [];
+  let cursor = 0;
+  normalized.forEach(opening => {
+    if (opening.start > cursor) {
+      segments.push({ start: cursor, end: opening.start });
+    }
+    cursor = Math.max(cursor, opening.end);
+  });
+  if (cursor < totalLength) {
+    segments.push({ start: cursor, end: totalLength });
+  }
+  return segments.filter(segment => segment.end - segment.start > 0.05);
+}
+
 // ---- Arena geometry helper ----
 
-function buildArenaRoom(scene, originX, originZ, width, depth, wallColor, floorColor) {
+function buildArenaRoom(scene, originX, originZ, width, depth, wallColor, floorColor, openings = {}) {
   const wallMat  = new THREE.MeshBasicMaterial({ color: wallColor });
   const floorMat = new THREE.MeshBasicMaterial({ color: floorColor });
   const ceilMat  = new THREE.MeshBasicMaterial({ color: 0x151820 });
@@ -31,20 +93,88 @@ function buildArenaRoom(scene, originX, originZ, width, depth, wallColor, floorC
   ceil.position.set(cx, WALL_H, cz);
   scene.add(ceil);
 
-  // Walls: N S E W
-  const walls = [
-    { pos: [cx, WALL_H/2, originZ],      size: [W, WALL_H, 0.3] },         // N
-    { pos: [cx, WALL_H/2, originZ + D],  size: [W, WALL_H, 0.3] },         // S
-    { pos: [originX,     WALL_H/2, cz],  size: [0.3, WALL_H, D] },         // W
-    { pos: [originX + W, WALL_H/2, cz],  size: [0.3, WALL_H, D] },         // E
-  ];
-  walls.forEach(({ pos, size }) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(...size), wallMat);
-    m.position.set(...pos);
-    scene.add(m);
+  const wallCells = [];
+  const thickness = 0.3;
+
+  buildSegments(W, openings.north ?? []).forEach(segment => {
+    const len = segment.end - segment.start;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(len, WALL_H, thickness), wallMat);
+    wall.position.set(originX + segment.start + len / 2, WALL_H / 2, originZ);
+    scene.add(wall);
+    wallCells.push({
+      minX: originX + segment.start,
+      maxX: originX + segment.end,
+      minY: 0,
+      maxY: WALL_H,
+      minZ: originZ - thickness,
+      maxZ: originZ,
+    });
   });
 
-  return { cx, cz, W, D, originX, originZ };
+  buildSegments(W, openings.south ?? []).forEach(segment => {
+    const len = segment.end - segment.start;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(len, WALL_H, thickness), wallMat);
+    wall.position.set(originX + segment.start + len / 2, WALL_H / 2, originZ + D);
+    scene.add(wall);
+    wallCells.push({
+      minX: originX + segment.start,
+      maxX: originX + segment.end,
+      minY: 0,
+      maxY: WALL_H,
+      minZ: originZ + D,
+      maxZ: originZ + D + thickness,
+    });
+  });
+
+  buildSegments(D, openings.west ?? []).forEach(segment => {
+    const len = segment.end - segment.start;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(thickness, WALL_H, len), wallMat);
+    wall.position.set(originX, WALL_H / 2, originZ + segment.start + len / 2);
+    scene.add(wall);
+    wallCells.push({
+      minX: originX - thickness,
+      maxX: originX,
+      minY: 0,
+      maxY: WALL_H,
+      minZ: originZ + segment.start,
+      maxZ: originZ + segment.end,
+    });
+  });
+
+  buildSegments(D, openings.east ?? []).forEach(segment => {
+    const len = segment.end - segment.start;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(thickness, WALL_H, len), wallMat);
+    wall.position.set(originX + W, WALL_H / 2, originZ + segment.start + len / 2);
+    scene.add(wall);
+    wallCells.push({
+      minX: originX + W,
+      maxX: originX + W + thickness,
+      minY: 0,
+      maxY: WALL_H,
+      minZ: originZ + segment.start,
+      maxZ: originZ + segment.end,
+    });
+  });
+
+  return { cx, cz, W, D, originX, originZ, wallCells };
+}
+
+function buildCorridor(scene, x, z, width, depth, floorColor, ceilingColor) {
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshBasicMaterial({ color: floorColor }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(x + width / 2, 0, z + depth / 2);
+  scene.add(floor);
+
+  const ceil = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshBasicMaterial({ color: ceilingColor }),
+  );
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.set(x + width / 2, WALL_H, z + depth / 2);
+  scene.add(ceil);
 }
 
 function buildSign(scene, text, x, y, z, color = 0xff2200) {
@@ -105,11 +235,13 @@ export class RansomwareKingArena {
   }
 
   _build() {
-    const { cx, cz, originX, originZ } = buildArenaRoom(
+    const layout = BOSS_ARENA_LAYOUTS['ransomware-king'];
+    const { cx, cz, originX, originZ, wallCells } = buildArenaRoom(
       this.scene,
       this.ORIGIN_X, this.ORIGIN_Z,
       this.WIDTH, this.DEPTH,
-      0x330011, 0x110008
+      0x330011, 0x110008,
+      { west: [layout.entrance] }
     );
 
     buildSign(this.scene, '⚠ ENCRYPTION ZONE — RANSOMWARE KING', cx, WALL_H - 0.4, originZ + 0.2, 0xff0066);
@@ -117,12 +249,7 @@ export class RansomwareKingArena {
     // Register arena walls as solid
     const W = this.WIDTH * TILE, D = this.DEPTH * TILE;
     const ox = this.ORIGIN_X, oz = this.ORIGIN_Z;
-    [
-      { minX: ox,   maxX: ox+W, minZ: oz-0.3, maxZ: oz    }, // N
-      { minX: ox,   maxX: ox+W, minZ: oz+D,   maxZ: oz+D+0.3 }, // S
-      { minX: ox-0.3, maxX: ox,  minZ: oz,   maxZ: oz+D  }, // W
-      { minX: ox+W, maxX: ox+W+0.3, minZ: oz, maxZ: oz+D }, // E
-    ].forEach(c => {
+    wallCells.forEach(c => {
       this._solid.push({ ...c, minY: 0, maxY: WALL_H });
       arenaCells.push({ ...c, minY: 0, maxY: WALL_H });
     });
@@ -164,20 +291,10 @@ export class RansomwareKingArena {
   _buildEntrance(cx, originZ) {
     // Corridor connecting Storage Vault east wall to arena west wall
     // cols 27-28, rows 5-6
-    const corrW = 2 * TILE, corrH = TILE;
+    const corrW = 2 * TILE, corrH = 2 * TILE;
     const corrX = 27 * TILE, corrZ = 5 * TILE;
 
-    const mat = new THREE.MeshBasicMaterial({ color: 0x220008 });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(corrW, corrH), mat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(corrX + corrW/2, 0, corrZ + corrH/2);
-    this.scene.add(floor);
-
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(corrW, corrH),
-      new THREE.MeshBasicMaterial({ color: 0x110005 }));
-    ceil.rotation.x = Math.PI / 2;
-    ceil.position.set(corrX + corrW/2, WALL_H, corrZ + corrH/2);
-    this.scene.add(ceil);
+    buildCorridor(this.scene, corrX, corrZ, corrW, corrH, 0x220008, 0x110005);
 
     // Danger sign at entrance
     buildSign(this.scene, 'RANSOMWARE CONTAINMENT ZONE — ENTER AT OWN RISK',
@@ -234,6 +351,10 @@ export class RansomwareKingArena {
   activate() { this._active = true; }
 
   onDefeat(fn) { this._onDefeat = fn; }
+
+  getNavigationTarget() {
+    return this.boss?.position?.clone?.() ?? null;
+  }
 
   update(dt, player, camera, level) {
     if (!this._active || this._bossDefeated) {
@@ -407,6 +528,25 @@ export class RansomwareKingArena {
     this._onDefeat?.();
   }
 
+  resolveCheckpointDefeat() {
+    this._active = false;
+    this._bossDefeated = true;
+    if (this.boss) {
+      this.boss.isDead = true;
+      this.boss.health = 0;
+    }
+    if (this.group) this.group.visible = false;
+    this._nodes.forEach(node => { node.mesh.visible = false; });
+    this._panels.forEach(panel => {
+      panel.encrypted = false;
+      panel.mesh.material.color.setHex(0x1a000a);
+      if (panel._lockMesh) {
+        this.scene.remove(panel._lockMesh);
+        panel._lockMesh = null;
+      }
+    });
+  }
+
   _showArenaMessage(text, color) {
     const el = document.createElement('div');
     el.style.cssText = `
@@ -446,6 +586,10 @@ export class CascadeTitanArena {
     this._bossDefeated = false;
     this._onDefeat     = null;
     this._electricPanels = [];
+    this._electricPattern = [];
+    this._electricWarningTimer = 0;
+    this._electricActiveTimer = 0;
+    this._electricEventTimer = 5.5;
     this._lightsOut    = false;
     this._ambientLight = null;
     this._elapsed      = 0;
@@ -455,11 +599,13 @@ export class CascadeTitanArena {
   }
 
   _build() {
-    const { cx, cz, originX, originZ } = buildArenaRoom(
+    const layout = BOSS_ARENA_LAYOUTS['cascade-titan'];
+    const { cx, cz, originX, originZ, wallCells } = buildArenaRoom(
       this.scene,
       this.ORIGIN_X, this.ORIGIN_Z,
       this.WIDTH, this.DEPTH,
-      0x221100, 0x0d0800
+      0x221100, 0x0d0800,
+      { north: [layout.entrance] }
     );
 
     buildSign(this.scene, '⚠ CASCADE FAILURE ZONE — CRITICAL INFRASTRUCTURE BREACH',
@@ -468,15 +614,12 @@ export class CascadeTitanArena {
     const W = this.WIDTH * TILE, D = this.DEPTH * TILE;
     const ox = this.ORIGIN_X, oz = this.ORIGIN_Z;
 
-    // Register walls
-    [
-      { minX: ox,   maxX: ox+W,     minZ: oz-0.3,    maxZ: oz       },
-      { minX: ox,   maxX: ox+W,     minZ: oz+D,      maxZ: oz+D+0.3 },
-      { minX: ox-0.3, maxX: ox,     minZ: oz,        maxZ: oz+D     },
-      { minX: ox+W, maxX: ox+W+0.3, minZ: oz,        maxZ: oz+D     },
-    ].forEach(c => {
+    wallCells.forEach(c => {
       this._solid.push({ ...c, minY: 0, maxY: WALL_H });
+      arenaCells.push({ ...c, minY: 0, maxY: WALL_H });
     });
+
+    buildCorridor(this.scene, 13 * TILE, 30 * TILE, 2 * TILE, 3 * TILE, 0x1d1206, 0x120a04);
 
     // Ambient — orange industrial
     this._ambientLight = new THREE.PointLight(0xff4400, 5, 80, 2);
@@ -497,6 +640,8 @@ export class CascadeTitanArena {
       this.scene.add(debris);
     }
 
+    this._buildElectricLanes(ox, oz, W, D);
+
     // Spawn boss
     const bossPos = new THREE.Vector3(cx, 0.01, oz + D * 0.35);
     this.boss = new CascadeFailureTitanFull(bossPos);
@@ -514,8 +659,46 @@ export class CascadeTitanArena {
     this.sprite.mesh.traverse(c => { c.userData.boss = this.boss; });
   }
 
+  _buildElectricLanes(ox, oz, W, D) {
+    const laneDefs = [
+      { x: ox + 5 * TILE,  z: oz + D / 2, w: 2 * TILE, h: D - 2 * TILE },
+      { x: ox + 14 * TILE, z: oz + D / 2, w: 2 * TILE, h: D - 2 * TILE },
+      { x: ox + 23 * TILE, z: oz + D / 2, w: 2 * TILE, h: D - 2 * TILE },
+      { x: ox + W / 2,     z: oz + 4 * TILE, w: W - 2 * TILE, h: 2 * TILE },
+      { x: ox + W / 2,     z: oz + 7 * TILE, w: W - 2 * TILE, h: 2 * TILE },
+      { x: ox + W / 2,     z: oz + 10 * TILE, w: W - 2 * TILE, h: 2 * TILE },
+    ];
+
+    laneDefs.forEach((lane, index) => {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(lane.w - 0.2, 0.03, lane.h - 0.2),
+        new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.05 }),
+      );
+      mesh.position.set(lane.x, 0.02, lane.z);
+      this.scene.add(mesh);
+
+      const light = new THREE.PointLight(0xffaa33, 0, 8, 2);
+      light.position.set(lane.x, 0.4, lane.z);
+      this.scene.add(light);
+
+      this._electricPanels.push({
+        index,
+        mesh,
+        light,
+        minX: lane.x - lane.w / 2,
+        maxX: lane.x + lane.w / 2,
+        minZ: lane.z - lane.h / 2,
+        maxZ: lane.z + lane.h / 2,
+      });
+    });
+  }
+
   activate() { this._active = true; }
   onDefeat(fn) { this._onDefeat = fn; }
+
+  getNavigationTarget() {
+    return this.boss?.position?.clone?.() ?? null;
+  }
 
   update(dt, player, camera, level) {
     if (!this._active || this._bossDefeated) {
@@ -554,6 +737,16 @@ export class CascadeTitanArena {
     if (!this._lightsOut) {
       this._ambientLight.intensity = 4 + Math.sin(this._elapsed * 3) * 1.5;
     }
+
+    if (this.boss.phase >= 3 && this._electricWarningTimer <= 0 && this._electricActiveTimer <= 0) {
+      this._electricEventTimer -= dt;
+      if (this._electricEventTimer <= 0) {
+        this._electricEventTimer = Math.max(4.2, 6.4 - this.boss.phase * 0.5);
+        this._startElectricPattern();
+      }
+    }
+
+    this._updateElectricFloor(dt, player);
 
     if (this.boss.isDead && !this._bossDefeated) {
       this._bossDefeated = true;
@@ -595,8 +788,14 @@ export class CascadeTitanArena {
 
   _triggerArenaEvent(event) {
     if (event === 'lights_flicker' || event === 'lights_out') {
+      this._lightsOut = event === 'lights_out';
       document.body.style.filter = 'brightness(0.2)';
-      setTimeout(() => { document.body.style.filter = ''; }, event === 'lights_out' ? 3000 : 300);
+      setTimeout(() => {
+        document.body.style.filter = '';
+        this._lightsOut = false;
+      }, event === 'lights_out' ? 3000 : 300);
+    } else if (event === 'electrify_floor') {
+      this._startElectricPattern();
     } else if (event === 'alarm') {
       document.getElementById('damage-overlay').style.boxShadow = 'inset 0 0 60px #ff440066';
       setTimeout(() => { document.getElementById('damage-overlay').style.boxShadow = ''; }, 600);
@@ -606,6 +805,70 @@ export class CascadeTitanArena {
       this._showMsg('MAXIMUM CHAOS — CRITICAL SYSTEM FAILURE', 0xff2200);
       this._ambientLight.color.setHex(0xff2200);
     }
+  }
+
+  _startElectricPattern() {
+    if (this._electricPanels.length === 0) return;
+    const groups = [
+      [0, 1, 2],
+      [3, 4, 5],
+    ];
+    const source = groups[Math.floor(Math.random() * groups.length)];
+    this._electricPattern = [...source].sort(() => Math.random() - 0.5).slice(0, 2);
+    this._electricWarningTimer = 1.1;
+    this._electricActiveTimer = 0;
+    this._showMsg('FLOOR ROUTING FAILURE — WATCH THE HOT LANES', 0xffaa00);
+  }
+
+  _updateElectricFloor(dt, player) {
+    if (this._electricWarningTimer > 0) {
+      this._electricWarningTimer = Math.max(0, this._electricWarningTimer - dt);
+      if (this._electricWarningTimer <= 0) {
+        this._electricActiveTimer = 4.2;
+        this._showMsg('FLOOR ENERGIZED — MOVE!', 0xffff66);
+      }
+    } else if (this._electricActiveTimer > 0) {
+      this._electricActiveTimer = Math.max(0, this._electricActiveTimer - dt);
+    }
+
+    const flash = Math.sin(this._elapsed * 12) > 0 ? 1 : 0.45;
+    this._electricPanels.forEach(panel => {
+      const active = this._electricPattern.includes(panel.index);
+      const warning = active && this._electricWarningTimer > 0;
+      const energized = active && this._electricActiveTimer > 0;
+
+      if (!active) {
+        panel.mesh.material.opacity = Math.max(0.02, panel.mesh.material.opacity - dt * 4);
+        panel.mesh.material.color.setHex(0x552200);
+        panel.light.intensity = Math.max(0, panel.light.intensity - dt * 6);
+        return;
+      }
+
+      if (warning) {
+        panel.mesh.material.color.setHex(0xff8800);
+        panel.mesh.material.opacity = 0.12 + flash * 0.12;
+        panel.light.color.setHex(0xff8800);
+        panel.light.intensity = 0.8 + flash * 1.2;
+        return;
+      }
+
+      if (energized) {
+        panel.mesh.material.color.setHex(0xffff66);
+        panel.mesh.material.opacity = 0.18 + flash * 0.2;
+        panel.light.color.setHex(0xffff99);
+        panel.light.intensity = 1.8 + flash * 1.8;
+        if (
+          player.position.x > panel.minX && player.position.x < panel.maxX &&
+          player.position.z > panel.minZ && player.position.z < panel.maxZ
+        ) {
+          player.takeDamage(28 * dt, 'electrical');
+        }
+        return;
+      }
+
+      panel.mesh.material.opacity = Math.max(0.02, panel.mesh.material.opacity - dt * 3);
+      panel.light.intensity = Math.max(0, panel.light.intensity - dt * 8);
+    });
   }
 
   _spawnSparks() {
@@ -647,6 +910,23 @@ export class CascadeTitanArena {
       }
     });
     this._onDefeat?.();
+  }
+
+  resolveCheckpointDefeat() {
+    this._active = false;
+    this._bossDefeated = true;
+    if (this.boss) {
+      this.boss.isDead = true;
+      this.boss.health = 0;
+    }
+    if (this.group) this.group.visible = false;
+    this._electricPattern = [];
+    this._electricWarningTimer = 0;
+    this._electricActiveTimer = 0;
+    this._electricPanels.forEach(panel => {
+      panel.mesh.material.opacity = 0.02;
+      panel.light.intensity = 0;
+    });
   }
 
   _showMsg(text, color) {
@@ -697,11 +977,13 @@ export class AuditArena {
   }
 
   _build() {
-    const { cx, cz, originX, originZ } = buildArenaRoom(
+    const layout = BOSS_ARENA_LAYOUTS['the-audit'];
+    const { cx, cz, originX, originZ, wallCells } = buildArenaRoom(
       this.scene,
       this.ORIGIN_X, this.ORIGIN_Z,
       this.WIDTH, this.DEPTH,
-      0x001122, 0x000a14
+      0x001122, 0x000a14,
+      { west: [layout.entrance] }
     );
 
     buildSign(this.scene, 'THE AUDIT — DR CERTIFICATION EXAMINATION',
@@ -710,14 +992,12 @@ export class AuditArena {
     const W = this.WIDTH * TILE, D = this.DEPTH * TILE;
     const ox = this.ORIGIN_X, oz = this.ORIGIN_Z;
 
-    [
-      { minX: ox,   maxX: ox+W,     minZ: oz-0.3,    maxZ: oz       },
-      { minX: ox,   maxX: ox+W,     minZ: oz+D,      maxZ: oz+D+0.3 },
-      { minX: ox-0.3, maxX: ox,     minZ: oz,        maxZ: oz+D     },
-      { minX: ox+W, maxX: ox+W+0.3, minZ: oz,        maxZ: oz+D     },
-    ].forEach(c => {
+    wallCells.forEach(c => {
       this._solid.push({ ...c, minY: 0, maxY: WALL_H });
+      arenaCells.push({ ...c, minY: 0, maxY: WALL_H });
     });
+
+    buildCorridor(this.scene, 28 * TILE, 16 * TILE, TILE, 2 * TILE, 0x001724, 0x000d14);
 
     // Blue ambient
     const blueLight = new THREE.PointLight(0x0044ff, 4, 60, 2);
@@ -859,7 +1139,14 @@ export class AuditArena {
       light.position.set(pos.x, 1.2, pos.z);
       this.scene.add(light);
 
-      const taskConsole = { mesh: group, screen, glow, light, taskIndex: i, accessed: false };
+      const beacon = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.55, 3.6, 10, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.0, side: THREE.DoubleSide })
+      );
+      beacon.position.set(pos.x, 1.85, pos.z);
+      this.scene.add(beacon);
+
+      const taskConsole = { mesh: group, screen, glow, light, beacon, taskIndex: i, accessed: false };
       this._taskConsoles.push(taskConsole);
 
       // Register as interactable
@@ -915,6 +1202,15 @@ export class AuditArena {
   onFailure(fn) { this._onFailure = fn; }
   setWaveSpawner(fn) { this._spawnWaveFn = fn; }
 
+  getNavigationTarget() {
+    return this.getCurrentTaskPosition() ?? this.boss?.position?.clone?.() ?? null;
+  }
+
+  getCurrentTaskPosition() {
+    const active = this._taskConsoles[this.boss?.currentTaskIndex ?? -1];
+    return active ? active.mesh.position.clone() : null;
+  }
+
   update(dt, player, camera, level) {
     if (!this._active || this._complete) {
       this.pickups.update(dt, player);
@@ -939,6 +1235,8 @@ export class AuditArena {
       this.boss.pendingWave = false;
       this._spawnAuditWave();
     }
+
+    this._updateTaskConsoleGuidance();
 
     // Update HUD
     this._updateAuditHUD();
@@ -1021,6 +1319,39 @@ export class AuditArena {
         `).join('')}
       </div>
     `;
+  }
+
+  _updateTaskConsoleGuidance() {
+    const activeTaskIndex = this.boss.currentTaskIndex;
+    const pulse = 0.55 + Math.sin(this._elapsed * 5.5) * 0.25;
+
+    this._taskConsoles.forEach((taskConsole, index) => {
+      const task = this.boss.tasks[index];
+      const isActive = activeTaskIndex === index && !task?.complete && !task?.failed;
+
+      taskConsole.beacon.material.opacity = isActive ? 0.12 + pulse * 0.15 : 0.0;
+      taskConsole.beacon.visible = isActive;
+      taskConsole.beacon.scale.setScalar(isActive ? 0.9 + pulse * 0.35 : 0.75);
+      taskConsole.beacon.rotation.y += isActive ? 0.02 : 0.005;
+
+      if (task?.complete || taskConsole.accessed) {
+        taskConsole.glow.material.color.setHex(0x00ff41);
+        taskConsole.light.color.setHex(0x00ff41);
+        taskConsole.light.intensity = 1.0;
+        return;
+      }
+
+      if (task?.failed) {
+        taskConsole.glow.material.color.setHex(0xff2200);
+        taskConsole.light.color.setHex(0xff2200);
+        taskConsole.light.intensity = 0.8;
+        return;
+      }
+
+      taskConsole.glow.material.color.setHex(isActive ? 0xffff66 : 0x0088ff);
+      taskConsole.light.color.setHex(isActive ? 0xffff66 : 0x0088ff);
+      taskConsole.light.intensity = isActive ? 1.25 + pulse * 0.9 : 0.8;
+    });
   }
 
   _onAuditComplete(player) {
