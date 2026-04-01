@@ -380,7 +380,7 @@ function launchGame(startMode = 'resume') {
   const saveCheckpoint = (arenaId) =>
     saves.saveCheckpoint(arenaId, player, weapons, _getCheckpointSpawn(arenaId));
 
-  const applyStartingArsenal = (options = {}) => {
+  function applyStartingArsenal(options = {}) {
     weapons.restoreUnlockedSlots(ALL_WEAPON_SLOTS);
     Object.entries(STARTING_ARSENAL.ammo).forEach(([ammoType, amount]) => {
       if (options.preserveAmmo) {
@@ -400,24 +400,24 @@ function launchGame(startMode = 'resume') {
       EnemySounds.pickupAmmo();
       _showSystemToast(STARTING_ARSENAL.toast, '#00ff41');
     }
-  };
+  }
 
-  const unlockAllProgressionDoors = (options = {}) => {
+  function unlockAllProgressionDoors(options = {}) {
     Object.values(RUNBOOK_DOOR_UNLOCKS).forEach(({ doorId }) => {
       level.unlockDoor(doorId, { silent: options.silent ?? true });
     });
-  };
+  }
 
-  const unlockDoorFromConsole = (consoleId) => {
+  function unlockDoorFromConsole(consoleId) {
     const unlock = RUNBOOK_DOOR_UNLOCKS[consoleId];
     if (!unlock) return;
     const changed = level.unlockDoor(unlock.doorId, { silent: true });
     if (changed) {
       _showSystemToast(`RUNBOOK UPDATE // ${unlock.toast}`, '#00ff41');
     }
-  };
+  }
 
-  const applyBossLoadout = (arenaId, options = {}) => {
+  function applyBossLoadout(arenaId, options = {}) {
     const loadout = BOSS_LOADOUTS[arenaId];
     if (!loadout) return;
 
@@ -433,9 +433,9 @@ function launchGame(startMode = 'resume') {
       EnemySounds.pickupAmmo();
       _showSystemToast(loadout.toast, '#ffaa00');
     }
-  };
+  }
 
-  const getNavigationTarget = () => {
+  function getNavigationTarget() {
     if (auditArena._active && !auditArena._complete) {
       const pos = auditArena.getNavigationTarget();
       return pos ? { position: pos, label: 'THE AUDIT', kind: 'boss' } : null;
@@ -459,7 +459,7 @@ function launchGame(startMode = 'resume') {
       return { position: target.position, label: target.label, kind: 'objective' };
     }
     return null;
-  };
+  }
 
   // Boss sequence
   rkArena.onDefeat(() => {
