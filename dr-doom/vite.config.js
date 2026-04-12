@@ -9,8 +9,12 @@ export default defineConfig({
     minify: 'terser',
     rollupOptions: {
       output: {
-        manualChunks: {
-          three: ['three'],
+        manualChunks(id) {
+          if (id.includes('/node_modules/three/')) {
+            return 'three';
+          }
+
+          return undefined;
         },
       },
     },
