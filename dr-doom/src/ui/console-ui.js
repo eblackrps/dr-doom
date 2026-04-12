@@ -100,7 +100,7 @@ export class ConsoleUI {
           display: flex;
           justify-content: space-between;
         ">
-          <span>ANYSTACKARCHITECT.COM // FIELD MANUAL v3.1</span>
+          <span>ERIC BLACK // FIELD MANUAL v3.1</span>
           <span id="console-clock"></span>
         </div>
       </div>

@@ -57,7 +57,7 @@ Output goes to `dist/`.
 
 ## Architecture
 
-Read more about the DR architecture concepts behind the game at [anystackarchitect.com](https://anystackarchitect.com).
+Read more about the DR architecture concepts behind the game on [Eric Black's GitHub profile](https://github.com/eblackrps).
 
 ## License
 

@@ -15,7 +15,7 @@ const BOOT_LINES = [
   { text: 'CRITICAL: RTO BREACH IN 02:00:00', cls: 'err', delay: 1800 },
   { text: '---------------------------------------------------', cls: 'info', delay: 1950 },
   { text: 'Deploying DR Engineer asset...', cls: 'ok', delay: 2100 },
-  { text: 'Loading threat intel feed: anystackarchitect.com ...', cls: 'info', delay: 2200 },
+  { text: 'Loading threat intel feed: DR field manual ...', cls: 'info', delay: 2200 },
   { text: 'Feed authenticated. DR runbook v3.1 loaded.', cls: 'ok', delay: 2350 },
   { text: 'Loading Three.js render engine ... OK', cls: 'ok', delay: 2500 },
   { text: 'Generating level geometry ... OK', cls: 'ok', delay: 2400 },

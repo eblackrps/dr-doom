@@ -232,7 +232,7 @@ export class TitleScreen {
       opacity: 0; transition: opacity 0.6s 1.2s;
     `;
     blog.id = 'title-blog';
-    blog.innerHTML = 'FIELD MANUAL &amp; DR ARCHITECTURE: <span style="color:#334433">ANYSTACKARCHITECT.COM</span>';
+    blog.innerHTML = 'FIELD MANUAL &amp; DR ARCHITECTURE: <span style="color:#334433">ERIC BLACK</span>';
     content.appendChild(blog);
 
     el.appendChild(content);
@@ -380,7 +380,7 @@ export class TitleScreen {
         <div style="font-size:11px;letter-spacing:4px;color:#ff2200;margin-bottom:20px;">CREDITS</div>
         <div style="font-size:10px;color:#557755;line-height:2.2;letter-spacing:1px;">
           CONCEPT, DESIGN &amp; DR CONTENT<br>
-          <span style="color:#00ff41;">ERIC // ANYSTACKARCHITECT.COM</span><br><br>
+          <span style="color:#00ff41;">ERIC BLACK // DR CONTENT</span><br><br>
           ENGINE BUILT WITH<br>
           <span style="color:#00ff41;">THREE.JS + VITE</span><br><br>
           SPECIAL THANKS<br>

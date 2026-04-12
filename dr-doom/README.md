@@ -57,7 +57,7 @@ A DOOM-inspired first-person shooter set in a failing data center. You are the D
 
 All DR concepts in this game reflect real infrastructure architecture.
 
-**anystackarchitect.com** — Veeam v13, VMware vSphere 8 / VCF, DR design patterns, MSP architecture, hands-on runbooks.
+**GitHub profile:** [github.com/eblackrps](https://github.com/eblackrps) — related DR tooling and project context.
 
 ---
 

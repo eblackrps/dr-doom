@@ -85,8 +85,8 @@ export class VictoryScreen {
           <div style="font-size:8px;letter-spacing:2px;color:#ffaa00;margin-bottom:6px;">FIELD MANUAL</div>
           <div style="font-size:9px;color:#446644;line-height:1.8;">
             The DR procedures in this game reflect real-world infrastructure architecture.<br>
-            Read the full runbook, Veeam guides, and VMware architecture at:<br>
-            <span style="color:#00ff41;letter-spacing:1px;">anystackarchitect.com</span>
+            Read the broader DR tooling and project context on GitHub:<br>
+            <span style="color:#00ff41;letter-spacing:1px;">github.com/eblackrps</span>
           </div>
         </div>
 
@@ -99,7 +99,7 @@ export class VictoryScreen {
 
           <div style="font-size:9px;color:#334433;line-height:2.4;letter-spacing:1px;">
             CONCEPT, DESIGN &amp; DR CONTENT<br>
-            <span style="color:#557755">ERIC // ANYSTACKARCHITECT.COM</span><br><br>
+            <span style="color:#557755">ERIC BLACK // DR CONTENT</span><br><br>
 
             ENGINE BUILT WITH<br>
             <span style="color:#557755">THREE.JS &amp; VITE</span><br><br>

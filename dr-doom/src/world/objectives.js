@@ -60,7 +60,7 @@ export const LEVEL1_OBJECTIVES = [
   {
     id: 'obj-architect-kb',
     label: 'SYNC FIELD MANUAL',
-    detail: 'Authenticate with AnyStack Architect knowledge base',
+    detail: 'Authenticate with DR field manual knowledge base',
     type: OBJ_TYPE.ACTIVATE_CONSOLE,
     consoleId: 'console-architect-kb',
     prereqs: [],

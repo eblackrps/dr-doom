@@ -90,7 +90,7 @@ export class PauseMenu {
     `;
     header.innerHTML = `
       <span>DR DOOM // PAUSED</span>
-      <span style="opacity:0.5">ANYSTACKARCHITECT.COM</span>
+      <span style="opacity:0.5">ERIC BLACK // DR FIELD MANUAL</span>
     `;
     panel.appendChild(header);
 

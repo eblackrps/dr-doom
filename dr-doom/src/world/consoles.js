@@ -1,6 +1,6 @@
 // All interactive console content for Level 1
 // Each console has an id, title, and paginated content screens
-// anystackarchitect.com is woven in as the field manual source
+// Eric Black's public DR notes are woven in as the field manual source
 
 export const CONSOLE_DATA = {
 
@@ -29,7 +29,7 @@ export const CONSOLE_DATA = {
         '',
         'An untested DR plan is not a DR plan. It is a hypothesis.',
         '',
-        'FIELD MANUAL: anystackarchitect.com',
+        'FIELD MANUAL: github.com/eblackrps',
       ],
     },
   },
@@ -59,7 +59,7 @@ export const CONSOLE_DATA = {
         'Before 2020, 3-2-1 was sufficient. It no longer is.',
         'Immutability is not optional in a modern DR architecture.',
         '',
-        'FIELD MANUAL: anystackarchitect.com',
+        'FIELD MANUAL: github.com/eblackrps',
       ],
     },
   },
@@ -90,7 +90,7 @@ export const CONSOLE_DATA = {
         'The goal: even if an attacker has domain admin, they cannot',
         'reach or modify the backup files.',
         '',
-        'FIELD MANUAL: anystackarchitect.com',
+        'FIELD MANUAL: github.com/eblackrps',
       ],
     },
   },
@@ -123,7 +123,7 @@ export const CONSOLE_DATA = {
         'and limits lateral movement if backup infrastructure is',
         'compromised by ransomware.',
         '',
-        'FIELD MANUAL: anystackarchitect.com',
+        'FIELD MANUAL: github.com/eblackrps',
       ],
     },
   },
@@ -155,7 +155,7 @@ export const CONSOLE_DATA = {
         'minutes. Your RTO assumes the physical plant is operational.',
         'Verify that assumption in writing.',
         '',
-        'FIELD MANUAL: anystackarchitect.com',
+        'FIELD MANUAL: github.com/eblackrps',
       ],
     },
   },
@@ -163,21 +163,21 @@ export const CONSOLE_DATA = {
   // Management Console Room — the ARCHITECT terminal (blog integration)
   'console-architect-kb': {
     title: 'ARCHITECT KNOWLEDGE BASE',
-    subtitle: 'FIELD MANUAL // anystackarchitect.com',
+    subtitle: 'FIELD MANUAL // github.com/eblackrps',
     lines: [
-      { label: 'SOURCE', value: 'ANYSTACKARCHITECT.COM', status: 'ok' },
+      { label: 'SOURCE', value: 'GITHUB.COM/EBLACKRPS', status: 'ok' },
       { label: 'ARTICLES', value: '37 — DR / VEEAM / VMWARE', status: 'ok' },
       { label: 'LAST SYNC', value: 'CURRENT', status: 'ok' },
       { label: 'CLEARANCE', value: 'FIELD ENGINEER', status: 'ok' },
     ],
     tip: {
-      heading: 'FIELD MANUAL // ANYSTACKARCHITECT.COM',
+      heading: 'FIELD MANUAL // GITHUB.COM/EBLACKRPS',
       body: [
-        'This terminal is synchronized with the AnyStack Architect',
+        "This terminal is synchronized with Eric Black's",
         'field manual. All DR runbooks, Veeam configuration guides,',
         'and infrastructure architecture references are sourced from:',
         '',
-        '    anystackarchitect.com',
+        '    github.com/eblackrps',
         '',
         'Written by engineers. For engineers.',
         'No vendor fluff. No marketing copy.',
@@ -188,7 +188,7 @@ export const CONSOLE_DATA = {
         '  - Multi-tenant MSP architecture',
         '',
         'The game you are playing is a DR exercise.',
-        'The site is the manual that gets you through it.',
+        'The profile is the public index behind it.',
       ],
     },
   },
@@ -221,7 +221,7 @@ export const CONSOLE_DATA = {
         'Test the runbook by having someone else execute it.',
         'If they get stuck, the runbook is incomplete.',
         '',
-        'FIELD MANUAL: anystackarchitect.com',
+        'FIELD MANUAL: github.com/eblackrps',
       ],
     },
   },

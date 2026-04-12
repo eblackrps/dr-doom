@@ -370,7 +370,7 @@ function launchGame() {
         ` &nbsp;|&nbsp; <span style="color:#ff4400">${count} THREATS</span>` +
         ` &nbsp;|&nbsp; <span style="color:#ffaa00">${prog}%</span>` +
         ` &nbsp;|&nbsp; <span style="color:#333">${m}:${s}</span>` +
-        `<br><span style="color:#1a2a1a;font-size:9px;letter-spacing:2px;">FIELD MANUAL: ANYSTACKARCHITECT.COM</span>`;
+        `<br><span style="color:#1a2a1a;font-size:9px;letter-spacing:2px;">FIELD MANUAL: ERIC BLACK</span>`;
     }
 
     renderer.render();

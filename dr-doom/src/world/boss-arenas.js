@@ -753,7 +753,7 @@ export class AuditArena {
     ctx.fillText('FAILURE IS NOT AN OPTION', 256, 170);
     ctx.fillStyle = '#003366';
     ctx.font = '12px Courier New';
-    ctx.fillText('anystackarchitect.com // DR RUNBOOK v3.1', 256, 220);
+    ctx.fillText('ERIC BLACK // DR RUNBOOK v3.1', 256, 220);
 
     const screenLabel = new THREE.Mesh(
       new THREE.PlaneGeometry(3.8, 2.3),
