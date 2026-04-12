@@ -38,7 +38,7 @@
     "check": "npm run debug"
   },
   "dependencies": {
-    "three": "^0.169.0"
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "terser": "^5.46.1",
