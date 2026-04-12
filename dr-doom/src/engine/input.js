@@ -101,12 +101,26 @@ export class InputHandler {
     });
 
     document.addEventListener('pointerlockchange', () => {
-      this.isLocked = document.pointerLockElement === this.canvas;
+      const nextLocked = document.pointerLockElement === this.canvas;
+      if (nextLocked !== this.isLocked) {
+        if (nextLocked) this._resetMouseState();
+        else this._resetAllState();
+      }
+      this.isLocked = nextLocked;
       this.lockPrompt.style.display = this.isLocked ? 'none' : 'flex';
     });
 
     document.addEventListener('pointerlockerror', () => {
       console.warn('DR DOOM: Pointer lock failed');
+    });
+
+    // Clear any latched movement or fire state when the window loses focus.
+    window.addEventListener('blur', () => {
+      this._resetAllState();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this._resetAllState();
     });
   }
 
@@ -134,18 +148,44 @@ export class InputHandler {
     return bindings.some(code => this.keys.has(code));
   }
 
+  matchesBinding(action, code) {
+    const bindings = this.keymap[action] ?? DEFAULT_KEYMAP[action] ?? [];
+    return bindings.includes(code);
+  }
+
   // Remap a key action
   remap(action, codes) {
     this.keymap[action] = Array.isArray(codes) ? codes : [codes];
-    localStorage.setItem(KEYMAP_STORAGE_KEY, JSON.stringify(this.keymap));
+    try {
+      localStorage.setItem(KEYMAP_STORAGE_KEY, JSON.stringify(this.keymap));
+    } catch {}
   }
 
   resetKeymap() {
     this.keymap = _cloneDefaultKeymap();
-    localStorage.setItem(KEYMAP_STORAGE_KEY, JSON.stringify(this.keymap));
+    try {
+      localStorage.setItem(KEYMAP_STORAGE_KEY, JSON.stringify(this.keymap));
+    } catch {}
   }
 
   isMouseButtonDown(button = 0) {
     return !!(this.mouse.buttons & (1 << button));
+  }
+
+  _resetMouseState() {
+    this.mouse.dx = 0;
+    this.mouse.dy = 0;
+    this.mouse.buttons = 0;
+    this._pendingDx = 0;
+    this._pendingDy = 0;
+    this._mouseJustPressed = 0;
+    this._pendingJustPressed = 0;
+    this.scrollDelta = 0;
+    this._pendingScroll = 0;
+  }
+
+  _resetAllState() {
+    this.keys.clear();
+    this._resetMouseState();
   }
 }

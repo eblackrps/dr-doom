@@ -262,7 +262,7 @@ function launchGame(startMode = 'resume') {
     weapons.restoreUnlockedSlots(checkpoint.unlockedSlots ?? ALL_WEAPON_SLOTS);
     if (checkpoint.ammo) {
       Object.entries(checkpoint.ammo).forEach(([k, v]) => {
-        weapons.ammo.counts[k] = v;
+        weapons.ammo.set(k, v);
       });
     }
     const checkpointPos = checkpoint.position ?? _getCheckpointSpawn(checkpoint.arenaId);
@@ -284,17 +284,27 @@ function launchGame(startMode = 'resume') {
 
   // Init audio on first pointer lock (user gesture required by Web Audio API)
   let audioStarted = false;
-  document.addEventListener('pointerlockchange', () => {
-    if (document.pointerLockElement && !audioStarted) {
-      audioStarted = true;
-      audio.init();
+  const syncAudio = async () => {
+    audio.init();
+    await audio.resume();
+    if (!audio.ready) return;
+
+    if (!audioStarted) {
       ambient.start();
       music.start();
       if (checkpoint?.arenaId) {
         music.setState('boss');
       }
-      audio.applySettings();
       pauseMenu.setAudioSystem(audio);
+      audioStarted = true;
+    }
+
+    audio.applySettings();
+  };
+
+  document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement === canvas) {
+      void syncAudio();
     }
   });
 
@@ -693,7 +703,6 @@ function launchGame(startMode = 'resume') {
   });
 
   loop.start();
-  window.addEventListener('resize', () => renderer.onResize());
 }
 
 function _showGameOverOverlay(titleText = 'SYSTEM DOWN', subText = 'RTO BREACHED — ALL SYSTEMS LOST', promptText = 'CLICK TO REBOOT') {

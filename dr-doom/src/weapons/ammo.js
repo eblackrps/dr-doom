@@ -9,6 +9,13 @@ export const AMMO_TYPES = {
   BFR_CELLS:        { name: 'BFR',       max: 3,   start: 1   }, // BFR-9000
 };
 
+function _normalizeAmmoAmount(type, amount, fallback = 0) {
+  if (!(type in AMMO_TYPES)) return null;
+  const numeric = Number(amount);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(AMMO_TYPES[type].max, Math.floor(numeric)));
+}
+
 export class AmmoPool {
   constructor() {
     this.counts = {};
@@ -18,7 +25,7 @@ export class AmmoPool {
   }
 
   get(type) {
-    return this.counts[type] ?? 0;
+    return Number.isFinite(this.counts[type]) ? this.counts[type] : 0;
   }
 
   consume(type, amount = 1) {
@@ -30,12 +37,16 @@ export class AmmoPool {
 
   add(type, amount) {
     if (this.counts[type] === undefined) return;
-    this.counts[type] = Math.min(AMMO_TYPES[type].max, this.counts[type] + amount);
+    const normalized = _normalizeAmmoAmount(type, amount, 0);
+    if (normalized == null || normalized <= 0) return;
+    this.counts[type] = Math.min(AMMO_TYPES[type].max, this.get(type) + normalized);
   }
 
   set(type, amount) {
     if (this.counts[type] === undefined) return;
-    this.counts[type] = Math.max(0, Math.min(AMMO_TYPES[type].max, amount));
+    const normalized = _normalizeAmmoAmount(type, amount, this.get(type));
+    if (normalized == null) return;
+    this.counts[type] = normalized;
   }
 
   isEmpty(type) {

@@ -16,11 +16,21 @@ export class AudioEngine {
     // Spatial listener (updated each frame to player position)
     this._listenerPos = { x: 0, y: 0, z: 0 };
     this._listenerYaw = 0;
+
+    this._boundVisibilityChange = () => {
+      this._syncFocusMute();
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this._boundVisibilityChange);
+    }
   }
 
   // Must be called on user gesture (click/keydown)
   init() {
-    if (this._initialized) return;
+    if (this._initialized) {
+      void this.resume();
+      return;
+    }
     try {
       this._ctx    = new (window.AudioContext || window.webkitAudioContext)();
       this._master = this._ctx.createGain();
@@ -40,14 +50,8 @@ export class AudioEngine {
 
       // Register bitcrusher worklet early so it's ready when needed
       this._registerBitcrusherWorklet();
-
-      // Apply mute on focus loss if setting enabled
-      if (this._settings.muteFocus) {
-        document.addEventListener('visibilitychange', () => {
-          if (document.hidden) this._master.gain.value = 0;
-          else this._master.gain.value = this._settings.master / 100;
-        });
-      }
+      this.applySettings();
+      void this.resume();
     } catch (e) {
       console.warn('DR DOOM Audio: Web Audio API not available', e);
     }
@@ -60,12 +64,24 @@ export class AudioEngine {
   applySettings() {
     if (!this._initialized) return;
     this._settings = this._loadSettings();
-    this._master.gain.value = this._settings.master / 100;
     Object.keys(this._gains).forEach(cat => {
       if (this._gains[cat]) {
         this._gains[cat].gain.value = (this._settings[cat] ?? 80) / 100;
       }
     });
+    this._syncFocusMute();
+  }
+
+  async resume() {
+    if (!this._initialized || !this._ctx) return;
+    if (this._ctx.state !== 'running') {
+      try {
+        await this._ctx.resume();
+      } catch (e) {
+        console.warn('DR DOOM Audio: resume failed', e);
+      }
+    }
+    this._syncFocusMute();
   }
 
   get ctx()    { return this._ctx; }
@@ -116,6 +132,13 @@ export class AudioEngine {
   connectToCategory(node, category) {
     const dest = this._gains[category] ?? this._master;
     node.connect(dest);
+  }
+
+  _syncFocusMute() {
+    if (!this._initialized || !this._master) return;
+    const isDocumentHidden = typeof document !== 'undefined' ? document.hidden : false;
+    const shouldMuteForFocusLoss = this._settings.muteFocus && isDocumentHidden;
+    this._master.gain.value = shouldMuteForFocusLoss ? 0 : this._settings.master / 100;
   }
 
   // Register the bitcrusher AudioWorklet processor from an inline Blob.

@@ -101,7 +101,8 @@ export class PauseMenu {
 
   _bindEsc() {
     window.addEventListener('keydown', (e) => {
-      if (e.code !== 'Escape') return;
+      const isPauseBinding = this._input?.matchesBinding?.('pause', e.code) ?? false;
+      if (!isPauseBinding && e.code !== 'Escape') return;
 
       if (this._remapping) {
         this._remapping = null;

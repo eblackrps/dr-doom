@@ -25,11 +25,15 @@ export function loadGameplaySettings() {
 
 export function saveGameplaySettings(partial = {}) {
   const next = normalize({ ...loadGameplaySettings(), ...partial });
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  } catch {}
   return next;
 }
 
 export function resetGameplaySettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_GAMEPLAY_SETTINGS));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_GAMEPLAY_SETTINGS));
+  } catch {}
   return { ...DEFAULT_GAMEPLAY_SETTINGS };
 }

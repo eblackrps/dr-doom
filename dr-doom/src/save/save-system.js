@@ -1,9 +1,14 @@
+import { AMMO_TYPES } from '../weapons/ammo.js';
+
 // DR DOOM Save System
 // DOOM-style: no mid-level saves except boss checkpoints
 // Persists: difficulty, level completion, best times, kill counts, secrets found
 
 const SAVE_KEY = 'dr-doom-save';
 const VERSION  = '1.5.0';
+const VALID_DIFFICULTIES = new Set(['intern', 'sysadmin', 'architect', 'nightmare']);
+const VALID_RANKS = new Set(['C', 'B', 'A', 'S']);
+const VALID_CHECKPOINT_ARENAS = new Set(['ransomware-king', 'cascade-titan', 'the-audit']);
 
 const DEFAULTS = {
   version:      VERSION,
@@ -19,6 +24,114 @@ const DEFAULTS = {
   firstPlay:    true,
 };
 
+function _toNonNegativeInt(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.floor(numeric));
+}
+
+function _uniqueStrings(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(item => typeof item === 'string' && item.length > 0))];
+}
+
+function _sanitizeNumberMap(value) {
+  const next = {};
+  if (!value || typeof value !== 'object') return next;
+  Object.entries(value).forEach(([key, entry]) => {
+    if (typeof key !== 'string' || key.length === 0) return;
+    const numeric = _toNonNegativeInt(entry, -1);
+    if (numeric >= 0) next[key] = numeric;
+  });
+  return next;
+}
+
+function _sanitizeRankMap(value) {
+  const next = {};
+  if (!value || typeof value !== 'object') return next;
+  Object.entries(value).forEach(([key, entry]) => {
+    if (typeof key !== 'string' || key.length === 0) return;
+    if (VALID_RANKS.has(entry)) next[key] = entry;
+  });
+  return next;
+}
+
+function _sanitizeAmmoSnapshot(value) {
+  const ammo = {};
+  if (!value || typeof value !== 'object') return ammo;
+
+  Object.entries(AMMO_TYPES).forEach(([ammoType, def]) => {
+    const numeric = Number(value[ammoType]);
+    if (!Number.isFinite(numeric)) return;
+    ammo[ammoType] = Math.max(0, Math.min(def.max, Math.floor(numeric)));
+  });
+
+  return ammo;
+}
+
+function _sanitizeCheckpointPosition(value) {
+  if (!value || typeof value !== 'object') return null;
+  const x = Number(value.x);
+  const y = Number(value.y);
+  const z = Number(value.z);
+  if (![x, y, z].every(Number.isFinite)) return null;
+  return { x, y, z };
+}
+
+function _sanitizeCheckpoint(value) {
+  if (!value || typeof value !== 'object') return null;
+  if (!VALID_CHECKPOINT_ARENAS.has(value.arenaId)) return null;
+
+  const unlockedSlots = Array.isArray(value.unlockedSlots)
+    ? [...new Set(
+      value.unlockedSlots
+        .map(slot => Number(slot))
+        .filter(slot => Number.isInteger(slot) && slot >= 1 && slot <= 7),
+    )].sort((a, b) => a - b)
+    : [];
+  const currentSlot = Number.isInteger(Number(value.currentSlot))
+    ? Math.max(1, Math.min(7, Number(value.currentSlot)))
+    : 1;
+
+  return {
+    arenaId: value.arenaId,
+    playerHp: _toNonNegativeInt(value.playerHp, 100),
+    playerArmor: _toNonNegativeInt(value.playerArmor, 0),
+    ammo: _sanitizeAmmoSnapshot(value.ammo),
+    unlockedSlots: unlockedSlots.length > 0 ? unlockedSlots : [1],
+    currentSlot,
+    position: _sanitizeCheckpointPosition(value.position),
+    savedAt: _toNonNegativeInt(value.savedAt, Date.now()),
+  };
+}
+
+function _cloneCheckpoint(value) {
+  if (!value) return null;
+  return {
+    ...value,
+    ammo: { ...value.ammo },
+    unlockedSlots: [...value.unlockedSlots],
+    position: value.position ? { ...value.position } : null,
+  };
+}
+
+function _normalizeSaveData(value) {
+  if (!value || typeof value !== 'object') return { ...DEFAULTS };
+  return {
+    version: VERSION,
+    difficulty: VALID_DIFFICULTIES.has(value.difficulty) ? value.difficulty : DEFAULTS.difficulty,
+    levelsComplete: _uniqueStrings(value.levelsComplete),
+    bestTimes: _sanitizeNumberMap(value.bestTimes),
+    bestKills: _sanitizeNumberMap(value.bestKills),
+    bestRanks: _sanitizeRankMap(value.bestRanks),
+    secretsFound: _uniqueStrings(value.secretsFound),
+    totalKills: _toNonNegativeInt(value.totalKills, DEFAULTS.totalKills),
+    totalPlayTime: _toNonNegativeInt(value.totalPlayTime, DEFAULTS.totalPlayTime),
+    checkpoint: _sanitizeCheckpoint(value.checkpoint),
+    firstPlay: typeof value.firstPlay === 'boolean' ? value.firstPlay : DEFAULTS.firstPlay,
+  };
+}
+
 export class SaveSystem {
   constructor() {
     this._data = this._load();
@@ -29,8 +142,7 @@ export class SaveSystem {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return { ...DEFAULTS };
       const parsed = JSON.parse(raw);
-      // Merge with defaults to handle new fields in updates
-      return { ...DEFAULTS, ...parsed };
+      return _normalizeSaveData(parsed);
     } catch {
       return { ...DEFAULTS };
     }
@@ -115,7 +227,7 @@ export class SaveSystem {
       z: player.position.z,
     };
 
-    this._data.checkpoint = {
+    this._data.checkpoint = _sanitizeCheckpoint({
       arenaId,
       playerHp:    Math.floor(player.health),
       playerArmor: Math.floor(player.armor),
@@ -124,7 +236,7 @@ export class SaveSystem {
       currentSlot: weapons.getSlot?.() ?? 1,
       position: pos,
       savedAt: Date.now(),
-    };
+    });
     this._save();
 
     // Show confirmation toast
@@ -132,7 +244,7 @@ export class SaveSystem {
   }
 
   getCheckpoint() {
-    return this._data.checkpoint;
+    return _cloneCheckpoint(this._data.checkpoint);
   }
 
   clearCheckpoint() {

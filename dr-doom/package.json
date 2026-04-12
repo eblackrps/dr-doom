@@ -2,15 +2,40 @@
   "name": "dr-doom",
   "version": "1.5.0",
   "description": "DR DOOM: Disaster Recovery — The Game",
+  "private": true,
+  "homepage": "https://eblackrps.github.io/dr-doom/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eblackrps/dr-doom.git",
+    "directory": "dr-doom"
+  },
+  "bugs": {
+    "url": "https://github.com/eblackrps/dr-doom/issues"
+  },
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.11.0",
+  "keywords": [
+    "browser-game",
+    "disaster-recovery",
+    "doom-like",
+    "fps",
+    "threejs",
+    "vite",
+    "webgl"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "validate:progression": "node ./scripts/validate-progression.mjs",
     "smoke": "node ./scripts/smoke-build.mjs",
-    "debug": "npm run validate:progression && npm run build && npm run smoke"
+    "debug": "npm run validate:progression && npm run build && npm run smoke",
+    "check": "npm run debug"
   },
   "dependencies": {
     "three": "^0.169.0"
